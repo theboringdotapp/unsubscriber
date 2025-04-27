@@ -40,6 +40,14 @@
             vertical-align: middle;
             margin-right: 8px;
         }
+        
+        /* White spinner for colored buttons */
+        .bg-gradient-to-r .spinner, 
+        [class*="bg-"] .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.25);
+            border-left-color: white;
+        }
+        
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
