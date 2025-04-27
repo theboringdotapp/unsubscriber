@@ -426,9 +426,11 @@ def unsubscribe_and_archive():
     try:
         email_ids = request.form.get('final_email_ids', '')
         unsubscribe_links = request.form.get('final_unsubscribe_links', '')
+        should_archive = request.form.get('should_archive', 'false').lower() in ('true', 'on', 'yes', '1')
         
         print(f"Received email_ids: {email_ids}")
         print(f"Received unsubscribe_links: {unsubscribe_links}")
+        print(f"Should archive: {should_archive}")
         
         # Parse comma-separated values from the form data
         email_ids = email_ids.split(',') if email_ids else []
@@ -463,24 +465,29 @@ def unsubscribe_and_archive():
                     status = 200
                     print(f"  MOCK MODE: Simulating successful GET request (status 200)")
                 
-                # Archive the email
-                if not MOCK_API:
-                    print(f"  Archiving email (removing from INBOX)")
-                    service.users().messages().modify(
-                        userId='me',
-                        id=email_id,
-                        body={'removeLabelIds': ['INBOX']}
-                    ).execute()
-                    print(f"  Email successfully archived")
+                # Archive the email if the should_archive flag is set
+                if should_archive:
+                    if not MOCK_API:
+                        print(f"  Archiving email (removing from INBOX)")
+                        service.users().messages().modify(
+                            userId='me',
+                            id=email_id,
+                            body={'removeLabelIds': ['INBOX']}
+                        ).execute()
+                        print(f"  Email successfully archived")
+                    else:
+                        print(f"  MOCK MODE: Simulating successful archive")
                 else:
-                    print(f"  MOCK MODE: Simulating successful archive")
+                    print(f"  Skipping archive as per user preference")
                 
                 # Record the result
                 success = 200 <= status < 300  # HTTP success status range
+                archived = should_archive
                 results.append({
                     'email_id': email_id,
                     'status': status,
-                    'success': success
+                    'success': success,
+                    'archived': archived
                 })
                 print(f"  Result: {'SUCCESS' if success else 'FAILED'}")
                 
@@ -491,11 +498,14 @@ def unsubscribe_and_archive():
                     'email_id': email_id,
                     'status': 'Error',
                     'error': str(e),
-                    'success': False
+                    'success': False,
+                    'archived': False
                 })
         
         success_count = sum(1 for result in results if result.get('success', False))
+        archive_count = sum(1 for result in results if result.get('archived', False))
         print(f"\nProcessed {len(results)} unsubscribe requests. {success_count} succeeded, {len(results) - success_count} failed.")
+        print(f"Archived {archive_count} emails.")
         
         if is_htmx_request:
             print("Returning HTMX response")
@@ -504,11 +514,15 @@ def unsubscribe_and_archive():
                 success=True,
                 results=results,
                 success_count=success_count,
-                total_count=len(results)
+                archive_count=archive_count,
+                total_count=len(results),
+                should_archive=should_archive
             )
         
         # Flash a message with the results
         message = f"Processed {len(results)} unsubscribe requests. {success_count} succeeded."
+        if should_archive:
+            message += f" {archive_count} emails were archived."
         status = "success" if success_count == len(results) else "info"
         print(f"Flashing message: {message} (status: {status})")
         flash(message, status)
