@@ -255,8 +255,9 @@
         const ids = Object.keys(selectedEmails);
         const links = Object.values(selectedEmails);
 
+        // Fix: Format data as simple comma-separated strings instead of trying to create JSON
         document.getElementById('final-email-ids').value = ids.join(',');
-        document.getElementById('final-unsubscribe-links').value = links.join(',,,,,');
+        document.getElementById('final-unsubscribe-links').value = links.join(',,,,,'); // Use five commas as delimiter to avoid URL conflicts
 
         if (ids.length === 0) {
             alert("Please select at least one email to unsubscribe.");

@@ -21,7 +21,7 @@ REDIRECT_URI = 'http://127.0.0.1:5001/oauth2callback'
 CREDENTIALS_FILE = 'credentials.json' # Download from Google Cloud Console
 
 # --- Mocking Setup ---
-MOCK_API = True # Set to False to use the real Gmail API
+MOCK_API = False # Set to False to use the real Gmail API
 
 def _get_mock_message_list(page_token=None):
     """Returns a mock response similar to messages.list()."""
@@ -423,9 +423,10 @@ def unsubscribe_and_archive():
         email_ids = request.form.get('final_email_ids', '')
         unsubscribe_links = request.form.get('final_unsubscribe_links', '')
         
-        # Parse JSON arrays from the form data
-        email_ids = json.loads(email_ids)
-        unsubscribe_links = json.loads(unsubscribe_links)
+        # Parse comma-separated values from the form data
+        email_ids = email_ids.split(',') if email_ids else []
+        # Split by five commas to handle URLs that might contain commas
+        unsubscribe_links = unsubscribe_links.split(',,,,,') if unsubscribe_links else []
         
         if not email_ids or not unsubscribe_links:
             flash("No emails selected", "warning")
