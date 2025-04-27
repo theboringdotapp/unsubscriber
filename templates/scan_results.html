@@ -81,17 +81,31 @@
 
     /* Sender group styles */
     .sender-group {
-        border-left: 3px solid var(--accent-color);
+        border-left: 3px solid var(--sender-color, var(--accent-color));
         margin-bottom: 1rem;
     }
     
     .sender-header {
         padding: 0.75rem 1rem;
-        background-color: rgba(var(--accent-color-rgb), 0.1);
-        cursor: pointer;
+        background-color: rgba(var(--sender-color-rgb, var(--accent-color-rgb)), 0.1);
         display: flex;
         justify-content: space-between;
         align-items: center;
+    }
+    
+    .sender-name-container {
+        cursor: pointer;
+    }
+    
+    .collapse-button {
+        cursor: pointer;
+        padding: 4px;
+        border-radius: 4px;
+        transition: background-color 0.2s;
+    }
+    
+    .collapse-button:hover {
+        background-color: rgba(0, 0, 0, 0.05);
     }
     
     .sender-emails {
@@ -102,6 +116,23 @@
         display: none;
     }
     
+    .sender-name {
+        transition: all 0.2s ease;
+    }
+    
+    .sender-selected .sender-name {
+        text-decoration: line-through;
+        opacity: 0.7;
+    }
+    
+    /* Content container with max-width */
+    .content-container {
+        max-width: 1280px;
+        margin: 0 auto;
+        width: 100%;
+    }
+    
+    /* Tooltip fixes */
     .tooltip {
         position: relative;
         display: inline-flex;
@@ -131,7 +162,7 @@
         border-radius: 6px;
         padding: 10px;
         position: absolute;
-        z-index: 1;
+        z-index: 10;
         bottom: 125%;
         left: 50%;
         transform: translateX(-50%);
@@ -158,111 +189,127 @@
         border-style: solid;
         border-color: #333 transparent transparent transparent;
     }
+    
+    /* Ensure tooltip container has overflow visible */
+    .tooltip-container {
+        position: relative;
+        overflow: visible;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="card-bg rounded-lg overflow-hidden">
-    <div class="px-6 py-4 border-b border-[var(--border-color)]">
-        <h1 class="text-2xl font-semibold">Potential Unsubscribe Emails</h1>
-        <p class="text-sm text-[var(--text-secondary)] mt-2">
-            You only need to unsubscribe from one email per sender to be removed from their mailing list.
-            <span class="tooltip">
-                <span class="tooltip-icon">?</span>
-                <span class="tooltip-text">
-                    <strong>How unsubscribing works:</strong><br>
-                    - You only need to unsubscribe once per sender to stop future emails<br>
-                    - Selecting multiple emails from the same sender will only trigger one unsubscribe request<br>
-                    - Archiving is optional and only affects emails already in your inbox
-                </span>
-            </span>
-        </p>
-    </div>
-
-    {% if emails %}
-        <form class="action-form" id="unsubscribe-form" action="{{ url_for('unsubscribe_and_archive') }}" method="post" onsubmit="handleUnsubscribeSubmit(event)">
-            <input type="hidden" name="final_email_ids" id="final-email-ids">
-            <input type="hidden" name="final_unsubscribe_links" id="final-unsubscribe-links">
-            <input type="hidden" name="should_archive" id="should-archive-input">
-
-            <div class="overflow-x-auto">
-                {% set grouped_emails = {} %}
-                
-                {# Group emails by sender #}
-                {% for email in emails %}
-                    {% if email.sender not in grouped_emails %}
-                        {% set _ = grouped_emails.update({email.sender: []}) %}
-                    {% endif %}
-                    {% set _ = grouped_emails[email.sender].append(email) %}
-                {% endfor %}
-                
-                <div id="email-list-body">
-                    {% for sender, sender_emails in grouped_emails.items() %}
-                        <div class="sender-group" data-sender="{{ sender | escape }}">
-                            <div class="sender-header" onclick="toggleSenderGroup(this)">
-                                <div class="flex items-center">
-                                    <input type="checkbox" onclick="event.stopPropagation(); handleSenderCheckboxClick(this, '{{ sender | escape }}')" class="form-checkbox h-4 w-4 rounded text-[var(--accent-color)] focus:ring-[var(--accent-color)] sender-checkbox mr-3">
-                                    <span class="font-medium">{{ sender }}</span>
-                                    <span class="ml-2 text-xs text-[var(--text-secondary)]">({{ sender_emails|length }} emails)</span>
-                                </div>
-                                <svg class="h-5 w-5 text-[var(--text-secondary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                                </svg>
-                            </div>
-                            <div class="sender-emails">
-                                <table class="min-w-full divide-y divide-[var(--border-color)] table-fixed">
-                                    <thead>
-                                        <tr>
-                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider w-16">
-                                                Select
-                                            </th>
-                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">
-                                                Subject
-                                            </th>
-                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider w-32">
-                                                Unsubscribe Link
-                                            </th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="divide-y divide-[var(--border-color)]">
-                                        {% for email in sender_emails %}
-                                        <tr data-sender="{{ email.sender | escape }}" data-id="{{ email.id }}" data-link="{{ email.unsubscribe_link }}" class="hover:bg-[var(--hover-bg)] clickable-row">
-                                            <td class="px-6 py-4 whitespace-nowrap w-16">
-                                                <input type="checkbox" name="email_ids_page" value="{{ email.id }}" onclick="handleSingleCheckboxClick(this)" class="form-checkbox h-4 w-4 rounded text-[var(--accent-color)] focus:ring-[var(--accent-color)] item-checkbox">
-                                            </td>
-                                            <td class="px-6 py-4 text-sm text-[var(--text-primary)] truncate" title="{{ email.subject }}">
-                                                {{ email.subject }}
-                                            </td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-secondary)] w-32">
-                                                <a href="{{ email.unsubscribe_link }}" target="_blank" class="text-[var(--accent-color)] hover:text-[var(--accent-hover)] hover:underline text-xs email-link" title="{{ email.unsubscribe_link }}">Visit Link</a>
-                                            </td>
-                                        </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    {% endfor %}
-                </div>
+<div class="content-container">
+    <div class="card-bg rounded-lg overflow-hidden">
+        <div class="px-6 py-4 border-b border-[var(--border-color)]">
+            <h1 class="text-2xl font-semibold">Potential Unsubscribe Emails</h1>
+            <div class="tooltip-container">
+                <p class="text-sm text-[var(--text-secondary)] mt-2">
+                    You only need to unsubscribe from one email per sender to be removed from their mailing list.
+                    <span class="tooltip">
+                        <span class="tooltip-icon">?</span>
+                        <span class="tooltip-text">
+                            <strong>How unsubscribing works:</strong><br>
+                            - You only need to unsubscribe once per sender to stop future emails<br>
+                            - Selecting multiple emails from the same sender will only trigger one unsubscribe request<br>
+                            - Archiving is optional and only affects emails already in your inbox
+                        </span>
+                    </span>
+                </p>
             </div>
-            
-            {% if next_page_token %}
-            <div class="px-6 py-4 text-right">
-                <a href="{{ url_for('scan_emails', token=next_page_token) }}" 
-                   id="next-page-button" 
-                   onclick="setLoading('next-page-button', 'Loading...')" 
-                   class="glass-button inline-flex items-center px-4 py-2 text-sm font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--accent-color)]">
-                    Next Page
-                </a>
-            </div>
-            {% endif %}
-        </form>
-    {% else %}
-        <div class="px-6 py-4">
-            <p class="text-[var(--text-secondary)]">No emails found with unsubscribe links in this batch or in your inbox.</p>
-             <a href="{{ url_for('index') }}" class="mt-4 inline-block text-[var(--accent-color)] hover:text-[var(--accent-hover)] hover:underline">Back to Home</a>
         </div>
-    {% endif %}
+
+        {% if emails %}
+            <form class="action-form" id="unsubscribe-form" action="{{ url_for('unsubscribe_and_archive') }}" method="post" onsubmit="handleUnsubscribeSubmit(event)">
+                <input type="hidden" name="final_email_ids" id="final-email-ids">
+                <input type="hidden" name="final_unsubscribe_links" id="final-unsubscribe-links">
+                <input type="hidden" name="should_archive" id="should-archive-input">
+
+                <div class="px-6">
+                    {% set grouped_emails = {} %}
+                    
+                    {# Group emails by sender #}
+                    {% for email in emails %}
+                        {% if email.sender not in grouped_emails %}
+                            {% set _ = grouped_emails.update({email.sender: []}) %}
+                        {% endif %}
+                        {% set _ = grouped_emails[email.sender].append(email) %}
+                    {% endfor %}
+                    
+                    <div id="email-list-body">
+                        {% for sender, sender_emails in grouped_emails.items() %}
+                            <div class="sender-group" data-sender="{{ sender | escape }}">
+                                <div class="sender-header">
+                                    <div class="flex items-center sender-name-container" onclick="handleSenderNameClick(event, this)">
+                                        <input type="checkbox" onclick="event.stopPropagation(); handleSenderCheckboxClick(this, '{{ sender | escape }}')" class="form-checkbox h-4 w-4 rounded text-[var(--accent-color)] focus:ring-[var(--accent-color)] sender-checkbox mr-3">
+                                        <div>
+                                            <span class="font-medium sender-name">{{ sender }}</span>
+                                            <span class="ml-2 text-xs text-[var(--text-secondary)]">({{ sender_emails|length }} emails)</span>
+                                        </div>
+                                    </div>
+                                    <div class="collapse-button" onclick="toggleSenderGroup(this)">
+                                        <svg class="h-5 w-5 text-[var(--text-secondary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                        </svg>
+                                    </div>
+                                </div>
+                                <div class="sender-emails">
+                                    <div class="overflow-x-auto">
+                                        <table class="min-w-full divide-y divide-[var(--border-color)] table-fixed">
+                                            <thead>
+                                                <tr>
+                                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider w-16">
+                                                        Select
+                                                    </th>
+                                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">
+                                                        Subject
+                                                    </th>
+                                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider w-32">
+                                                        Unsubscribe Link
+                                                    </th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="divide-y divide-[var(--border-color)]">
+                                                {% for email in sender_emails %}
+                                                <tr data-sender="{{ email.sender | escape }}" data-id="{{ email.id }}" data-link="{{ email.unsubscribe_link }}" class="hover:bg-[var(--hover-bg)] clickable-row">
+                                                    <td class="px-6 py-4 whitespace-nowrap w-16">
+                                                        <input type="checkbox" name="email_ids_page" value="{{ email.id }}" onclick="handleSingleCheckboxClick(this)" class="form-checkbox h-4 w-4 rounded text-[var(--accent-color)] focus:ring-[var(--accent-color)] item-checkbox">
+                                                    </td>
+                                                    <td class="px-6 py-4 text-sm text-[var(--text-primary)] truncate" title="{{ email.subject }}">
+                                                        {{ email.subject }}
+                                                    </td>
+                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-secondary)] w-32">
+                                                        <a href="{{ email.unsubscribe_link }}" target="_blank" class="text-[var(--accent-color)] hover:text-[var(--accent-hover)] hover:underline text-xs email-link" title="{{ email.unsubscribe_link }}">Visit Link</a>
+                                                    </td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                
+                {% if next_page_token %}
+                <div class="px-6 py-4 text-right">
+                    <a href="{{ url_for('scan_emails', token=next_page_token) }}" 
+                       id="next-page-button" 
+                       onclick="setLoading('next-page-button', 'Loading...')" 
+                       class="glass-button inline-flex items-center px-4 py-2 text-sm font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--accent-color)]">
+                        Next Page
+                    </a>
+                </div>
+                {% endif %}
+            </form>
+        {% else %}
+            <div class="px-6 py-4">
+                <p class="text-[var(--text-secondary)]">No emails found with unsubscribe links in this batch or in your inbox.</p>
+                 <a href="{{ url_for('index') }}" class="mt-4 inline-block text-[var(--accent-color)] hover:text-[var(--accent-hover)] hover:underline">Back to Home</a>
+            </div>
+        {% endif %}
+    </div>
 </div>
 
 <!-- Modal for unsubscribe results -->
@@ -294,7 +341,7 @@
             id="unsubscribe-button" 
             class="inline-flex items-center justify-center px-5 py-2 text-sm font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--accent-color)] bg-gradient-to-r from-[#0969da] to-[#8250df] text-white hover:translate-y-[-2px] hover:shadow-md transition-all duration-200" 
             disabled>
-        Unsubscribe <span id="selected-count" class="font-bold mx-1">0</span> <span id="selected-text">Emails</span>
+        <span id="button-action-text">Unsubscribe</span> <span id="selected-count" class="font-bold mx-1">0</span> <span id="selected-text">Emails</span>
     </button>
 </div>
 
@@ -342,6 +389,56 @@
             delete selectedEmails[emailId];
         }
         saveSelectedEmails(selectedEmails);
+    }
+    
+    // --- Color Generation ---
+    function stringToColor(str) {
+        // Simple hash function
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+            hash = str.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        
+        // Convert to a good hue value (0-360)
+        const hue = Math.abs(hash % 360);
+        
+        // Use a fixed saturation and lightness for consistent, readable colors
+        return `hsl(${hue}, 75%, 45%)`;
+    }
+    
+    function getRGBComponents(color) {
+        // For CSS variables, we need RGB components
+        // Create a temporary div
+        const temp = document.createElement('div');
+        temp.style.color = color;
+        document.body.appendChild(temp);
+        
+        // Get the computed style
+        const style = window.getComputedStyle(temp);
+        const rgb = style.color;
+        
+        document.body.removeChild(temp);
+        
+        // Extract RGB values using regex
+        const match = rgb.match(/\d+/g);
+        if (match && match.length >= 3) {
+            return match.slice(0, 3).join(', ');
+        }
+        
+        return '0, 0, 0'; // Default if something goes wrong
+    }
+    
+    function applySenderColors() {
+        document.querySelectorAll('.sender-group').forEach(group => {
+            const sender = group.dataset.sender;
+            if (!sender) return;
+            
+            const color = stringToColor(sender);
+            const rgbComponents = getRGBComponents(color);
+            
+            group.style.setProperty('--sender-color', color);
+            group.style.setProperty('--sender-color-rgb', rgbComponents);
+        });
     }
 
     // --- UI Updates ---
@@ -407,6 +504,18 @@
                 footerSpacer.style.height = '0';
             }
         }
+        
+        // Update button action text based on archive checkbox
+        updateButtonActionText();
+    }
+    
+    function updateButtonActionText() {
+        const archiveCheckbox = document.getElementById('archive-checkbox');
+        const buttonActionSpan = document.getElementById('button-action-text');
+        
+        if (buttonActionSpan && archiveCheckbox) {
+            buttonActionSpan.textContent = archiveCheckbox.checked ? 'Unsubscribe & Archive' : 'Unsubscribe';
+        }
     }
 
     function loadSelectionFromStorage() {
@@ -445,23 +554,66 @@
                 // Set sender checkbox state
                 senderCheckbox.checked = allChecked;
                 senderCheckbox.indeterminate = anyChecked && !allChecked;
+                
+                // Update strikethrough class
+                const senderHeader = group.querySelector('.sender-header');
+                if (senderHeader) {
+                    if (allChecked) {
+                        senderHeader.classList.add('sender-selected');
+                    } else {
+                        senderHeader.classList.remove('sender-selected');
+                    }
+                }
             }
         });
     }
     
     // --- Group Toggle ---
-    function toggleSenderGroup(header) {
+    function toggleSenderGroup(collapseButton) {
+        const header = collapseButton.closest('.sender-header');
         const group = header.closest('.sender-group');
         const content = group.querySelector('.sender-emails');
         content.classList.toggle('collapsed');
         
         // Toggle arrow icon
-        const arrow = header.querySelector('svg');
+        const arrow = collapseButton.querySelector('svg');
         if (content.classList.contains('collapsed')) {
             arrow.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>';
         } else {
             arrow.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>';
         }
+    }
+    
+    // --- Handle sender name click ---
+    function handleSenderNameClick(event, nameContainer) {
+        // Stop propagation to prevent other handlers from firing
+        event.stopPropagation();
+        
+        // Find the group and checkbox
+        const group = nameContainer.closest('.sender-group');
+        if (!group) {
+            console.error("Could not find sender group");
+            return;
+        }
+        
+        const senderCheckbox = group.querySelector('.sender-checkbox');
+        if (!senderCheckbox) {
+            console.error("Could not find sender checkbox");
+            return;
+        }
+        
+        // Toggle the checkbox
+        senderCheckbox.checked = !senderCheckbox.checked;
+        
+        // Get the sender from the data attribute
+        const sender = group.dataset.sender;
+        if (!sender) {
+            console.error("Could not find sender data");
+            return;
+        }
+        
+        // Call the checkbox click handler
+        handleSenderCheckboxClick(senderCheckbox, sender);
     }
 
     // --- Event Handlers ---
@@ -501,6 +653,7 @@
         });
         
         updateFixedFooter(); // Update footer visibility and count
+        updateSenderCheckboxes(); // Update strikethrough
     }
 
     // Row click handler
@@ -722,10 +875,18 @@
             emailListBody.addEventListener('click', handleRowClick);
         }
         
+        // Add event listener for archive checkbox
+        if (archiveCheckbox) {
+            archiveCheckbox.addEventListener('change', updateButtonActionText);
+        }
+        
         // Expand/collapse all sender groups on load
         document.querySelectorAll('.sender-emails').forEach(content => {
             content.classList.remove('collapsed');
         });
+        
+        // Apply custom colors to sender groups
+        applySenderColors();
 
         // Load state and set initial UI *after* potential clearing
         loadSelectionFromStorage();
@@ -735,6 +896,7 @@
         window.removeProcessedEmails = removeProcessedEmails;
         window.closeErrorMessage = closeErrorMessage;
         window.toggleSenderGroup = toggleSenderGroup;
+        window.handleSenderNameClick = handleSenderNameClick;
     });
     
     // Add fade-out animation style
