@@ -3,27 +3,41 @@
 {% block title %}Home - Gmail Unsubscriber{% endblock %}
 
 {% block content %}
-<div class="card-bg shadow-lg rounded-lg p-6 md:p-10 text-center">
-    <h1 class="text-3xl font-bold mb-6 text-gray-100">Gmail Unsubscriber</h1>
+<div class="card-bg rounded-lg p-8 md:p-12 text-center max-w-2xl mx-auto">
+    <div class="mb-8">
+        <div class="text-center mb-6">
+            <span class="text-5xl">✨</span>
+            <h1 class="text-3xl font-bold mt-3">Gmail Unsubscriber</h1>
+            <p class="text-[var(--text-secondary)] mt-3">Clean up your inbox by easily unsubscribing from unwanted emails</p>
+        </div>
+    </div>
 
     {% if authenticated %}
-        <p class="text-lg mb-4">Welcome back!</p>
-        <p class="text-gray-400 mb-6">Ready to find emails you can unsubscribe from?</p>
-        <a href="{{ url_for('scan_emails') }}"
-           id="scan-button"
-           onclick="setLoading('scan-button', 'Scanning...')"
-           class="glass-button inline-flex items-center justify-center px-6 py-3 text-base font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 focus:ring-offset-gray-900">
-            Scan Inbox for Unsubscribe Links
-        </a>
-         <!-- Loading indicator handled inside button now -->
-
+        <div class="bg-[var(--hover-bg)] rounded-lg p-6 mb-8">
+            <p class="text-lg mb-2">Welcome back!</p>
+            <p class="text-[var(--text-secondary)] mb-4">Ready to find emails you can unsubscribe from?</p>
+            <a href="{{ url_for('scan_emails') }}"
+               id="scan-button"
+               onclick="setLoading('scan-button', 'Scanning...')"
+               class="inline-flex items-center justify-center px-6 py-3 text-base font-medium rounded-md bg-[var(--accent-color)] text-white hover:bg-[var(--accent-hover)] transition-all shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--accent-color)]">
+                Scan Inbox for Unsubscribe Links
+            </a>
+        </div>
+        <div class="text-[var(--text-secondary)] text-sm">
+            Your data is processed securely and we don't store your emails
+        </div>
     {% else %}
-        <p class="text-lg mb-6 text-gray-300">Please authenticate with your Google Account to scan emails and manage subscriptions.</p>
-        <a href="{{ url_for('login') }}"
-           id="login-button"
-           class="glass-button inline-flex items-center justify-center px-6 py-3 text-base font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 focus:ring-offset-gray-900">
-            Login with Google
-        </a>
+        <div class="bg-[var(--hover-bg)] rounded-lg p-6 mb-8">
+            <p class="text-lg mb-4 text-[var(--text-primary)]">Please authenticate with your Google Account to scan emails and manage subscriptions.</p>
+            <a href="{{ url_for('login') }}"
+               id="login-button"
+               class="inline-flex items-center justify-center px-6 py-3 text-base font-medium rounded-md bg-[var(--accent-color)] text-white hover:bg-[var(--accent-hover)] transition-all shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--accent-color)]">
+                Login with Google
+            </a>
+        </div>
+        <div class="text-[var(--text-secondary)] text-sm">
+            We only request access to read and modify your emails to help you unsubscribe
+        </div>
     {% endif %}
 </div>
 {% endblock %} 

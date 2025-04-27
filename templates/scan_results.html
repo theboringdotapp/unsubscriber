@@ -3,9 +3,9 @@
 {% block title %}Scan Results - Gmail Unsubscriber{% endblock %}
 
 {% block content %}
-<div class="card-bg shadow-lg rounded-lg overflow-hidden pb-20">
+<div class="card-bg rounded-lg overflow-hidden">
     <div class="px-6 py-4 border-b border-[var(--border-color)]">
-        <h1 class="text-2xl font-semibold text-gray-100">Potential Unsubscribe Emails</h1>
+        <h1 class="text-2xl font-semibold">Potential Unsubscribe Emails</h1>
     </div>
 
     {% if emails %}
@@ -15,10 +15,10 @@
 
             <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-[var(--border-color)]">
-                    <thead class="bg-gray-800">
+                    <thead>
                         <tr>
                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider w-12">
-                                <input type="checkbox" id="select-all-checkbox" title="Select/Deselect All" class="form-checkbox h-4 w-4 rounded bg-gray-700 border-gray-600 text-[var(--accent-color)] focus:ring-[var(--accent-color)] focus:ring-offset-gray-800">
+                                <input type="checkbox" id="select-all-checkbox" title="Select/Deselect All" class="form-checkbox h-4 w-4 rounded text-[var(--accent-color)] focus:ring-[var(--accent-color)]">
                             </th>
                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">Sender</th>
                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">Subject</th>
@@ -27,9 +27,9 @@
                     </thead>
                     <tbody class="divide-y divide-[var(--border-color)]" id="email-list-body">
                         {% for email in emails %}
-                        <tr data-sender="{{ email.sender | escape }}" data-id="{{ email.id }}" data-link="{{ email.unsubscribe_link }}" class="hover:bg-gray-700/50 clickable-row">
+                        <tr data-sender="{{ email.sender | escape }}" data-id="{{ email.id }}" data-link="{{ email.unsubscribe_link }}" class="hover:bg-[var(--hover-bg)] clickable-row">
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <input type="checkbox" name="email_ids_page" value="{{ email.id }}" onclick="handleSingleCheckboxClick(this)" class="form-checkbox h-4 w-4 rounded bg-gray-700 border-gray-600 text-[var(--accent-color)] focus:ring-[var(--accent-color)] focus:ring-offset-gray-800 item-checkbox">
+                                <input type="checkbox" name="email_ids_page" value="{{ email.id }}" onclick="handleSingleCheckboxClick(this)" class="form-checkbox h-4 w-4 rounded text-[var(--accent-color)] focus:ring-[var(--accent-color)] item-checkbox">
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-[var(--text-primary)]">{{ email.sender }}</td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-primary)] truncate" title="{{ email.subject }}">{{ email.subject }}</td>
@@ -41,6 +41,17 @@
                     </tbody>
                 </table>
             </div>
+            
+            {% if next_page_token %}
+            <div class="px-6 py-4 text-right">
+                <a href="{{ url_for('scan_emails', token=next_page_token) }}" 
+                   id="next-page-button" 
+                   onclick="setLoading('next-page-button', 'Loading...')" 
+                   class="glass-button inline-flex items-center px-4 py-2 text-sm font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--accent-color)]">
+                    Next Page
+                </a>
+            </div>
+            {% endif %}
         </form>
     {% else %}
         <div class="px-6 py-4">
@@ -50,21 +61,19 @@
     {% endif %}
 </div>
 
+<!-- Spacer div that will dynamically adjust its height when the action bar appears -->
+<div id="footer-spacer" class="h-0 transition-all duration-200"></div>
+
 {# Define the action bar content here, NOT hidden initially, to be moved by JS #}
 {# The outer bar (#fixed-action-bar in base.html) controls visibility #}
-<div id="fixed-action-bar-content" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between flex-wrap gap-4">
-    <div>
-        <button type="submit" form="unsubscribe-form" id="unsubscribe-button" class="glass-button inline-flex items-center justify-center px-4 py-2 text-sm font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 focus:ring-offset-gray-900" disabled>
-            <span id="selected-count">0 </span> Email(s) Selected - Unsubscribe & Archive
-        </button>
-    </div>
-    <div>
-        {% if next_page_token %}
-            <a href="{{ url_for('scan_emails', token=next_page_token) }}" id="next-page-button" onclick="setLoading('next-page-button', 'Loading...')" class="glass-button inline-flex items-center px-4 py-2 text-sm font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 focus:ring-offset-gray-900">
-                Next Page
-            </a>
-        {% endif %}
-    </div>
+<div id="fixed-action-bar-content" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-end flex-wrap gap-4">
+    <button type="submit" 
+            form="unsubscribe-form" 
+            id="unsubscribe-button" 
+            class="inline-flex items-center justify-center px-5 py-2 text-sm font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--accent-color)] bg-gradient-to-r from-[#0969da] to-[#8250df] text-white hover:translate-y-[-2px] hover:shadow-md transition-all duration-200" 
+            disabled>
+        <span id="selected-count">0 </span> Email(s) Selected - Unsubscribe & Archive
+    </button>
 </div>
 
 {% endblock %}
@@ -79,6 +88,7 @@
     let itemCheckboxes = [];        // Initialize as empty array
     let unsubscribeButton = null;   // Initialize as null
     let emailListBody = null;       // Initialize as null
+    let footerSpacer = null;        // Initialize as null
 
     // --- Storage Management ---
     function getSelectedEmails() {
@@ -121,8 +131,9 @@
         const count = Object.keys(selectedEmails).length;
         console.log("Selected count:", count);
 
-        // Rebuild the button content correctly
-        const buttonContent = `<span id="selected-count">${count}</span> Email(s) Selected - Unsubscribe & Archive`;
+        // Rebuild the button content with improved label
+        const emailText = count === 1 ? "Email" : "Emails";
+        const buttonContent = `Unsubscribe & Archive <span id="selected-count" class="font-bold mx-1">${count}</span> ${emailText}`;
         // Set the entire innerHTML of the button
         unsubscribeButton.innerHTML = buttonContent;
         console.log("Updated button innerHTML");
@@ -131,10 +142,22 @@
             console.log("Showing fixed footer");
             fixedActionBar.classList.remove('hidden');
             unsubscribeButton.disabled = false;
+            
+            // Adjust the spacer height to match the action bar height
+            if (footerSpacer) {
+                // Get the height of the action bar
+                const actionBarHeight = fixedActionBar.offsetHeight;
+                footerSpacer.style.height = actionBarHeight + 'px';
+            }
         } else {
             console.log("Hiding fixed footer");
             fixedActionBar.classList.add('hidden');
             unsubscribeButton.disabled = true;
+            
+            // Reset spacer height when action bar is hidden
+            if (footerSpacer) {
+                footerSpacer.style.height = '0';
+            }
         }
     }
 
@@ -297,6 +320,7 @@
         // Find elements *after* DOM is loaded
         fixedActionBar = document.getElementById('fixed-action-bar');
         actionBarContent = document.getElementById('fixed-action-bar-content');
+        footerSpacer = document.getElementById('footer-spacer');
         // selectedCountSpan will be found inside updateFixedFooter
         selectAllCheckbox = document.getElementById('select-all-checkbox');
         itemCheckboxes = document.querySelectorAll('.item-checkbox');
@@ -307,6 +331,7 @@
         if (!fixedActionBar) console.error("#fixed-action-bar not found!");
         if (!actionBarContent) console.error("#fixed-action-bar-content not found!");
         if (!emailListBody) console.error("#email-list-body not found!");
+        if (!footerSpacer) console.error("#footer-spacer not found!");
         // unsubscribeButton check is implicitly done in updateFixedFooter
 
         // *** Check if this is a page refresh/initial load vs pagination ***

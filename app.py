@@ -7,13 +7,17 @@ from googleapiclient.discovery import build
 from google.auth.transport.requests import Request
 from flask import Flask, render_template, redirect, url_for, request, session, flash
 import requests
+import json
+import sys
+import argparse
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)  # Needed for Flask session management
 
 # Google API Scopes
 SCOPES = ['https://www.googleapis.com/auth/gmail.modify'] # Read, modify (for archiving), send
-REDIRECT_URI = 'http://127.0.0.1:5000/oauth2callback'
+# Set default REDIRECT_URI (can be overridden in main)
+REDIRECT_URI = 'http://127.0.0.1:5001/oauth2callback'
 CREDENTIALS_FILE = 'credentials.json' # Download from Google Cloud Console
 
 # --- Mocking Setup ---
@@ -405,94 +409,90 @@ def scan_emails():
 
 @app.route('/unsubscribe', methods=['POST'])
 def unsubscribe_and_archive():
-    """Processes selected emails: calls unsubscribe link and archives."""
+    """Process unsubscribe links and archive emails."""
+    # Check if this is an HTMX request
+    is_htmx_request = request.headers.get('HX-Request') == 'true'
+    
     service = get_gmail_service()
     if not service:
-        flash("Authentication required.", "warning")
-        return redirect(url_for('login'))
-
-    # Get data from the hidden fields populated by JavaScript
-    final_ids_str = request.form.get('final_email_ids', '')
-    final_links_str = request.form.get('final_unsubscribe_links', '')
-
-    selected_ids = final_ids_str.split(',') if final_ids_str else []
-    # Use the custom separator to split links correctly
-    unsubscribe_links = final_links_str.split(',,,,,') if final_links_str else []
-
-    # Basic validation: Ensure the number of IDs and links match
-    if len(selected_ids) != len(unsubscribe_links):
-        flash("Error: Mismatch between selected email IDs and links.", "error")
-        # Redirect back to scan results, potentially losing state without more complex handling
-        # For simplicity, redirecting home. Consider redirecting back to scan results
-        # if you implement passing the page token back or storing it.
+        flash("Please login first", "warning")
         return redirect(url_for('index'))
-
-    if not selected_ids:
-        flash("No emails selected for unsubscribing.", "warning")
-        # Redirect back? Let's redirect home for now.
-        return redirect(url_for('index'))
-
-    processed_count = 0
-    error_count = 0
-    skipped_mailto_count = 0
-
-    # Pair IDs with their links
-    actions = dict(zip(selected_ids, unsubscribe_links))
-
-    for msg_id, link in actions.items():
-        if not msg_id or not link: # Skip empty entries if splitting resulted in them
-            continue
-        try:
-            # 1. Attempt to "visit" the unsubscribe link (simple GET request)
-            if link.startswith('http'):
-                try:
-                    headers = {'User-Agent': 'Mozilla/5.0'}
-                    response = requests.get(link, timeout=15, headers=headers) # Increased timeout slightly
-                    response.raise_for_status() # Raise exception for bad status codes (4xx or 5xx)
-                    print(f"Visited unsubscribe link for {msg_id}: {link} (Status: {response.status_code})")
-                    # Archive only if HTTP request was successful
+        
+    # Get the selected email IDs and unsubscribe links
+    try:
+        email_ids = request.form.get('final_email_ids', '')
+        unsubscribe_links = request.form.get('final_unsubscribe_links', '')
+        
+        # Parse JSON arrays from the form data
+        email_ids = json.loads(email_ids)
+        unsubscribe_links = json.loads(unsubscribe_links)
+        
+        if not email_ids or not unsubscribe_links:
+            flash("No emails selected", "warning")
+            if is_htmx_request:
+                return render_template('partials/unsubscribe_result.html', success=False, message="No emails selected")
+            return redirect(url_for('index'))
+            
+        # Process each unsubscribe link and archive the email
+        results = []
+        for i, (email_id, link) in enumerate(zip(email_ids, unsubscribe_links)):
+            try:
+                # Visit the unsubscribe link
+                if not MOCK_API:
+                    response = requests.get(link, timeout=5)  # Set a reasonable timeout
+                    status = response.status_code
+                else:
+                    # Mock a successful request
+                    status = 200
+                
+                # Archive the email
+                if not MOCK_API:
                     service.users().messages().modify(
                         userId='me',
-                        id=msg_id,
+                        id=email_id,
                         body={'removeLabelIds': ['INBOX']}
                     ).execute()
-                    processed_count += 1
-                    print(f"Archived email {msg_id} after successful unsubscribe visit.")
-
-                except requests.exceptions.RequestException as req_err:
-                    # Log error but *don't* archive if the unsubscribe failed
-                    print(f"Warning: Failed to visit unsubscribe link {link} for {msg_id}: {req_err}. Email NOT archived.")
-                    error_count += 1 # Count as an error if the unsubscribe failed
-
-            elif link.startswith('mailto:'):
-                print(f"Info: Unsubscribe for {msg_id} requires sending an email: {link}. Manual action needed. Email NOT archived.")
-                skipped_mailto_count += 1
-                # Don't archive mailto links as action wasn't automatically completed
-                pass
-            else:
-                 print(f"Warning: Unknown link type for {msg_id}: {link}. Email NOT archived.")
-                 error_count += 1 # Count as error if link type is unknown
-
-            # Removed the separate archiving step here - it's now conditional on HTTP success
-
-        except Exception as e:
-            error_count += 1
-            print(f"Error processing email {msg_id}: {e}")
-            # Don't stop the whole process, just note the error
-
-    flash_message = f"Attempted to process {len(selected_ids)} emails. Successfully unsubscribed and archived: {processed_count}. "
-    if skipped_mailto_count > 0:
-        flash_message += f"Skipped {skipped_mailto_count} mailto links (manual action required). "
-    if error_count > 0:
-        flash_message += f"Encountered {error_count} errors (failed to visit link or other issue - check logs)."
-
-    flash(flash_message, "info")
-    # Clear selection after processing
-    # session.pop(storageKey, None) # This won't work as storage is client-side
-    # Client-side needs to clear its own storage upon success indication, maybe via redirect param?
-    # For now, rely on user starting fresh or manually clearing session.
-
-    return redirect(url_for('index'))
+                
+                # Record the result
+                results.append({
+                    'email_id': email_id,
+                    'status': status,
+                    'success': 200 <= status < 300  # HTTP success status range
+                })
+                
+            except Exception as e:
+                # Record the failure
+                results.append({
+                    'email_id': email_id,
+                    'status': 'Error',
+                    'error': str(e),
+                    'success': False
+                })
+        
+        success_count = sum(1 for result in results if result.get('success', False))
+        
+        if is_htmx_request:
+            return render_template(
+                'partials/unsubscribe_result.html',
+                success=True,
+                results=results,
+                success_count=success_count,
+                total_count=len(results)
+            )
+        
+        # Flash a message with the results
+        flash(f"Processed {len(results)} unsubscribe requests. {success_count} succeeded.", 
+              "success" if success_count == len(results) else "info")
+        
+        # Clear the session storage by returning JavaScript
+        # This doesn't need to be done for HTMX requests, as we'll handle it in the template
+        return redirect(url_for('index'))
+        
+    except Exception as e:
+        flash(f"Error processing unsubscribe requests: {e}", "error")
+        if is_htmx_request:
+            return render_template('partials/unsubscribe_result.html', success=False, message=f"Error: {e}")
+        return redirect(url_for('index'))
 
 
 if __name__ == '__main__':

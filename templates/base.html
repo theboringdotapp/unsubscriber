@@ -5,29 +5,36 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Gmail Unsubscriber{% endblock %}</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
     <style>
-        /* GitHub Dark Dimmed Inspired Palette (Approximation) */
+        /* Modern Light Mode Palette inspired by GitHub, Figma, and Canva */
         :root {
-            --bg-primary: #22272e; /* Dark background */
-            --bg-secondary: #2d333b; /* Slightly lighter surface */
-            --border-color: rgba(255, 255, 255, 0.15);
-            --text-primary: #adbac7; /* Primary text */
-            --text-secondary: #768390; /* Secondary text */
-            --accent-color: #809fff; /* Accent blue/purple */
-            --accent-hover: #a3b8ff;
-            --glass-bg: rgba(128, 159, 255, 0.1); /* Accent at 10% */
-            --glass-bg-hover: rgba(128, 159, 255, 0.2); /* Accent at 20% */
-            --glass-border: rgba(255, 255, 255, 0.2);
-            --glass-border-hover: rgba(255, 255, 255, 0.3);
+            --bg-primary: #f8f9fc; /* Light background */
+            --bg-secondary: #ffffff; /* White surface */
+            --border-color: rgba(0, 0, 0, 0.1);
+            --text-primary: #24292f; /* Primary text - dark gray */
+            --text-secondary: #57606a; /* Secondary text - medium gray */
+            --accent-color: #0969da; /* GitHub blue */
+            --accent-hover: #0452b5;
+            --glass-bg: rgba(9, 105, 218, 0.08); /* Accent at 8% */
+            --glass-bg-hover: rgba(9, 105, 218, 0.15); /* Accent at 15% */
+            --glass-border: rgba(9, 105, 218, 0.3);
+            --glass-border-hover: rgba(9, 105, 218, 0.5);
+            --success-color: #1a7f37; /* GitHub green */
+            --warning-color: #9e6a03; /* GitHub yellow */
+            --error-color: #cf222e; /* GitHub red */
+            --purple-accent: #8250df; /* GitHub purple for variety */
+            --hover-bg: #f6f8fa; /* Light gray hover background */
+            --card-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
         }
 
         /* Simple spinner styles - Updated Color */
         .spinner {
-            border: 4px solid rgba(255, 255, 255, 0.1); /* Lighter border */
+            border: 4px solid rgba(9, 105, 218, 0.1);
             width: 24px;
             height: 24px;
             border-radius: 50%;
-            border-left-color: var(--accent-color); /* Use accent color */
+            border-left-color: var(--accent-color);
             animation: spin 1s ease infinite;
             display: inline-block;
             vertical-align: middle;
@@ -39,67 +46,119 @@
         }
         .hidden { display: none; }
 
-        /* Glassmorphism Button Style */
+        /* Modern Button Style */
         .glass-button {
             background-color: var(--glass-bg);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px); /* Safari support */
             border: 1px solid var(--glass-border);
             color: var(--accent-color);
-            transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out, color 0.2s ease-in-out;
+            transition: all 0.2s ease-in-out;
+            font-weight: 500;
             /* Combine with Tailwind classes for padding, rounding, font size etc. */
         }
         .glass-button:hover {
             background-color: var(--glass-bg-hover);
             border-color: var(--glass-border-hover);
             color: var(--accent-hover);
+            transform: translateY(-1px);
+        }
+        .glass-button:focus {
+            box-shadow: 0 0 0 3px rgba(9, 105, 218, 0.3);
+        }
+        .glass-button:active {
+            transform: translateY(1px);
         }
         .glass-button:disabled {
-             opacity: 0.6;
-             cursor: not-allowed;
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
         }
 
         /* Apply base colors */
         body {
             background-color: var(--bg-primary);
             color: var(--text-primary);
-        }
-        nav, footer, .card-bg { /* Add card-bg class for content cards */
-            background-color: var(--bg-secondary);
+            font-family: 'Inter', system-ui, sans-serif;
+            line-height: 1.5;
         }
         nav, footer {
-            border-bottom: 1px solid var(--border-color);
-            border-top: 1px solid var(--border-color); /* Add top border for footer consistency */
+            background-color: var(--bg-secondary);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
         }
-        /* Adjust link colors if needed */
+        .card-bg { 
+            background-color: var(--bg-secondary);
+            box-shadow: var(--card-shadow);
+            border: 1px solid var(--border-color);
+        }
+        
+        /* Links and interactive elements */
         a { color: var(--accent-color); }
         a:hover { color: var(--accent-hover); }
+
+        /* Form elements */
+        input[type="checkbox"] {
+            border: 1.5px solid var(--border-color);
+            border-radius: 4px;
+        }
+        input[type="checkbox"]:checked {
+            background-color: var(--accent-color);
+            border-color: var(--accent-color);
+        }
+
+        /* Tables */
+        table thead {
+            background-color: var(--hover-bg);
+        }
+        table tbody tr:hover {
+            background-color: var(--hover-bg);
+        }
 
         /* Clickable Table Row Style */
         .clickable-row {
             cursor: pointer;
+            transition: background-color 0.15s ease-in-out;
         }
 
+        /* Custom alert styles */
+        .alert-success {
+            background-color: rgba(26, 127, 55, 0.1);
+            border-left: 4px solid var(--success-color);
+            color: var(--success-color);
+        }
+        .alert-error {
+            background-color: rgba(207, 34, 46, 0.1);
+            border-left: 4px solid var(--error-color);
+            color: var(--error-color);
+        }
+        .alert-warning {
+            background-color: rgba(158, 106, 3, 0.1);
+            border-left: 4px solid var(--warning-color);
+            color: var(--warning-color);
+        }
+        .alert-info {
+            background-color: rgba(9, 105, 218, 0.1);
+            border-left: 4px solid var(--accent-color);
+            color: var(--accent-color);
+        }
     </style>
     {% block head_extra %}{% endblock %}
 </head>
 <body class="min-h-screen flex flex-col">
 
     <!-- Navigation Bar -->
-    <nav class="shadow-md sticky top-0 z-50">
+    <nav class="sticky top-0 z-50">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center h-16">
                 <div class="flex items-center">
-                    <span class="text-2xl">✨</span> <!-- Adjusted logo color implicitly via body style -->
-                    <span class="ml-3 font-semibold text-xl text-gray-100">Gmail Unsubscriber</span> <!-- Make title lighter -->
+                    <span class="text-2xl">✨</span>
+                    <span class="ml-3 font-semibold text-xl">Gmail Unsubscriber</span>
                 </div>
                 <div class="flex items-center">
                     {% if authenticated %}
-                        <a href="{{ url_for('login') }}" class="glass-button font-bold py-2 px-4 rounded text-sm">
+                        <a href="{{ url_for('login') }}" class="glass-button font-medium py-2 px-4 rounded-md text-sm">
                             Logout / Re-Auth
                         </a>
                     {% else %}
-                         <a href="{{ url_for('login') }}" class="glass-button font-bold py-2 px-4 rounded text-sm">
+                         <a href="{{ url_for('login') }}" class="glass-button font-medium py-2 px-4 rounded-md text-sm">
                              Login with Google
                          </a>
                     {% endif %}
@@ -110,20 +169,20 @@
 
     <!-- Main Content Area -->
     <main class="flex-grow container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <!-- Flash Messages (Adjust styling for dark theme) -->
+        <!-- Flash Messages -->
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 <div class="mb-6 space-y-3">
                 {% for category, message in messages %}
-                    {% set alert_class = 'bg-blue-900 border-blue-700 text-blue-300' %}
+                    {% set alert_class = 'alert-info' %}
                     {% if category == 'success' %}
-                        {% set alert_class = 'bg-green-900 border-green-700 text-green-300' %}
+                        {% set alert_class = 'alert-success' %}
                     {% elif category == 'error' %}
-                        {% set alert_class = 'bg-red-900 border-red-700 text-red-300' %}
+                        {% set alert_class = 'alert-error' %}
                     {% elif category == 'warning' %}
-                         {% set alert_class = 'bg-yellow-900 border-yellow-700 text-yellow-300' %}
+                         {% set alert_class = 'alert-warning' %}
                     {% endif %}
-                    <div class="border-l-4 p-4 {{ alert_class }} rounded-r-md" role="alert"> <!-- Added rounding -->
+                    <div class="p-4 {{ alert_class }} rounded-md shadow-sm" role="alert">
                         <p>{{ message }}</p>
                     </div>
                 {% endfor %}
@@ -137,25 +196,43 @@
 
     <!-- Footer -->
     <footer class="mt-auto">
-        <div class="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 text-center text-sm text-gray-400">
+        <div class="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 text-center text-sm text-gray-500">
             Simple Unsubscriber MVP
         </div>
     </footer>
 
     <!-- Global JS -->
     <script>
-        // Updated setLoading to handle glass buttons
+        // Updated setLoading to handle both normal and gradient buttons
         function setLoading(buttonId, loadingText = 'Processing...') {
             const button = document.getElementById(buttonId);
             if (button) {
                 button.disabled = true;
-                // Store original content if needed, e.g., button.dataset.originalContent = button.innerHTML;
-                button.innerHTML = `<span class="spinner"></span><span class="ml-2">${loadingText}</span>`;
-                // Add a class to signify loading state if needed for more specific styling
+                // Store the original innerHTML if needed for later restoration
+                button.dataset.originalContent = button.innerHTML;
+                
+                // Create the loading content
+                const loadingContent = `<span class="spinner"></span><span class="ml-2">${loadingText}</span>`;
+                
+                // Set the button content to show loading state
+                button.innerHTML = loadingContent;
+                
+                // Add a class to signify loading state
                 button.classList.add('is-loading');
             }
         }
-        // function hideLoading(buttonId) { ... restore original content ...}
+        
+        function hideLoading(buttonId) {
+            const button = document.getElementById(buttonId);
+            if (button && button.classList.contains('is-loading')) {
+                // Restore the original content if available
+                if (button.dataset.originalContent) {
+                    button.innerHTML = button.dataset.originalContent;
+                }
+                button.disabled = false;
+                button.classList.remove('is-loading');
+            }
+        }
     </script>
     {% block scripts %}{% endblock %}
 

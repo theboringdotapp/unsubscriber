@@ -1,0 +1,12 @@
+{% for email in emails %}
+<tr data-sender="{{ email.sender | escape }}" data-id="{{ email.id }}" data-link="{{ email.unsubscribe_link }}" class="hover:bg-[var(--hover-bg)] clickable-row">
+    <td class="px-6 py-4 whitespace-nowrap">
+        <input type="checkbox" name="email_ids_page" value="{{ email.id }}" onclick="handleSingleCheckboxClick(this)" class="form-checkbox h-4 w-4 rounded text-[var(--accent-color)] focus:ring-[var(--accent-color)] item-checkbox">
+    </td>
+    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-[var(--text-primary)]">{{ email.sender }}</td>
+    <td class="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-primary)] truncate" title="{{ email.subject }}">{{ email.subject }}</td>
+    <td class="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-secondary)]">
+        <a href="{{ email.unsubscribe_link }}" target="_blank" class="text-[var(--accent-color)] hover:text-[var(--accent-hover)] hover:underline text-xs email-link" title="{{ email.unsubscribe_link }}">Visit Link</a>
+    </td>
+</tr>
+{% endfor %} 
