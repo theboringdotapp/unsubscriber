@@ -1,0 +1,346 @@
+{% extends 'base.html' %}
+
+{% block title %}Scan Results - Gmail Unsubscriber{% endblock %}
+
+{% block content %}
+<div class="card-bg shadow-lg rounded-lg overflow-hidden pb-20">
+    <div class="px-6 py-4 border-b border-[var(--border-color)]">
+        <h1 class="text-2xl font-semibold text-gray-100">Potential Unsubscribe Emails</h1>
+    </div>
+
+    {% if emails %}
+        <form class="action-form" id="unsubscribe-form" action="{{ url_for('unsubscribe_and_archive') }}" method="post" onsubmit="prepareFormSubmission(event)">
+            <input type="hidden" name="final_email_ids" id="final-email-ids">
+            <input type="hidden" name="final_unsubscribe_links" id="final-unsubscribe-links">
+
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-[var(--border-color)]">
+                    <thead class="bg-gray-800">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider w-12">
+                                <input type="checkbox" id="select-all-checkbox" title="Select/Deselect All" class="form-checkbox h-4 w-4 rounded bg-gray-700 border-gray-600 text-[var(--accent-color)] focus:ring-[var(--accent-color)] focus:ring-offset-gray-800">
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">Sender</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">Subject</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">Unsubscribe Link</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-[var(--border-color)]" id="email-list-body">
+                        {% for email in emails %}
+                        <tr data-sender="{{ email.sender | escape }}" data-id="{{ email.id }}" data-link="{{ email.unsubscribe_link }}" class="hover:bg-gray-700/50 clickable-row">
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <input type="checkbox" name="email_ids_page" value="{{ email.id }}" onclick="handleSingleCheckboxClick(this)" class="form-checkbox h-4 w-4 rounded bg-gray-700 border-gray-600 text-[var(--accent-color)] focus:ring-[var(--accent-color)] focus:ring-offset-gray-800 item-checkbox">
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-[var(--text-primary)]">{{ email.sender }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-primary)] truncate" title="{{ email.subject }}">{{ email.subject }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-secondary)]">
+                                <a href="{{ email.unsubscribe_link }}" target="_blank" class="text-[var(--accent-color)] hover:text-[var(--accent-hover)] hover:underline text-xs email-link" title="{{ email.unsubscribe_link }}">Visit Link</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </form>
+    {% else %}
+        <div class="px-6 py-4">
+            <p class="text-[var(--text-secondary)]">No emails found with unsubscribe links in this batch or in your inbox.</p>
+             <a href="{{ url_for('index') }}" class="mt-4 inline-block text-[var(--accent-color)] hover:text-[var(--accent-hover)] hover:underline">Back to Home</a>
+        </div>
+    {% endif %}
+</div>
+
+{# Define the action bar content here, NOT hidden initially, to be moved by JS #}
+{# The outer bar (#fixed-action-bar in base.html) controls visibility #}
+<div id="fixed-action-bar-content" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between flex-wrap gap-4">
+    <div>
+        <button type="submit" form="unsubscribe-form" id="unsubscribe-button" class="glass-button inline-flex items-center justify-center px-4 py-2 text-sm font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 focus:ring-offset-gray-900" disabled>
+            <span id="selected-count">0 </span> Email(s) Selected - Unsubscribe & Archive
+        </button>
+    </div>
+    <div>
+        {% if next_page_token %}
+            <a href="{{ url_for('scan_emails', token=next_page_token) }}" id="next-page-button" onclick="setLoading('next-page-button', 'Loading...')" class="glass-button inline-flex items-center px-4 py-2 text-sm font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 focus:ring-offset-gray-900">
+                Next Page
+            </a>
+        {% endif %}
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const storageKey = 'selectedEmails';
+    let fixedActionBar = null;      // Initialize as null, find on DOMContentLoaded
+    let actionBarContent = null;    // Initialize as null
+    let selectedCountSpan = null;   // Initialize as null
+    let selectAllCheckbox = null;   // Initialize as null
+    let itemCheckboxes = [];        // Initialize as empty array
+    let unsubscribeButton = null;   // Initialize as null
+    let emailListBody = null;       // Initialize as null
+
+    // --- Storage Management ---
+    function getSelectedEmails() {
+        const stored = sessionStorage.getItem(storageKey);
+        try {
+            return stored ? JSON.parse(stored) : {}; // Store as {id: link}
+        } catch (e) {
+            console.error("Error parsing selectedEmails from sessionStorage:", e);
+            return {}; // Return empty object on error
+        }
+    }
+
+    function saveSelectedEmails(emails) {
+        try {
+            sessionStorage.setItem(storageKey, JSON.stringify(emails));
+        } catch (e) {
+            console.error("Error saving selectedEmails to sessionStorage:", e);
+        }
+    }
+
+    function updateSelectionStorage(emailId, link, isSelected) {
+        const selectedEmails = getSelectedEmails();
+        if (isSelected) {
+            selectedEmails[emailId] = link;
+        } else {
+            delete selectedEmails[emailId];
+        }
+        saveSelectedEmails(selectedEmails);
+    }
+
+    // --- UI Updates ---
+    function updateFixedFooter() {
+        console.log("updateFixedFooter called");
+        if (!fixedActionBar || !unsubscribeButton) {
+            console.error("Cannot update footer - fixedActionBar or unsubscribeButton not found.");
+            return;
+        }
+
+        const selectedEmails = getSelectedEmails();
+        const count = Object.keys(selectedEmails).length;
+        console.log("Selected count:", count);
+
+        // Rebuild the button content correctly
+        const buttonContent = `<span id="selected-count">${count}</span> Email(s) Selected - Unsubscribe & Archive`;
+        // Set the entire innerHTML of the button
+        unsubscribeButton.innerHTML = buttonContent;
+        console.log("Updated button innerHTML");
+
+        if (count > 0) {
+            console.log("Showing fixed footer");
+            fixedActionBar.classList.remove('hidden');
+            unsubscribeButton.disabled = false;
+        } else {
+            console.log("Hiding fixed footer");
+            fixedActionBar.classList.add('hidden');
+            unsubscribeButton.disabled = true;
+        }
+    }
+
+    function loadSelectionFromStorage() {
+        console.log("loadSelectionFromStorage called");
+        const selectedEmails = getSelectedEmails();
+        let allVisibleChecked = itemCheckboxes.length > 0;
+        itemCheckboxes.forEach(checkbox => {
+            const emailId = checkbox.value;
+            checkbox.checked = selectedEmails.hasOwnProperty(emailId);
+            if (!checkbox.checked) {
+                allVisibleChecked = false;
+            }
+        });
+        if (selectAllCheckbox) {
+            selectAllCheckbox.checked = allVisibleChecked;
+        }
+    }
+
+    // --- Event Handlers ---
+    function handleSingleCheckboxClick(checkbox) {
+        console.log("handleSingleCheckboxClick called for:", checkbox.value, "Checked:", checkbox.checked);
+        const row = checkbox.closest('tr');
+        if (!row) {
+            console.error("Could not find parent row for checkbox", checkbox);
+            return;
+        }
+        const emailId = row.dataset.id;
+        const link = row.dataset.link;
+        if (!emailId || link === undefined) {
+             console.error("Missing data-id or data-link on row", row);
+             return;
+        }
+
+        updateSelectionStorage(emailId, link, checkbox.checked);
+        updateFixedFooter(); // Update footer visibility and count
+
+        // Update Select All state
+        let allVisibleChecked = true;
+        itemCheckboxes.forEach(cb => {
+            if (!cb.checked) allVisibleChecked = false;
+        });
+        if (selectAllCheckbox) {
+            selectAllCheckbox.checked = allVisibleChecked;
+        }
+
+        // Trigger sender selection logic if the box was checked
+        if (checkbox.checked) {
+            handleSenderSelection(checkbox, row.dataset.sender);
+        }
+    }
+
+    // Row click handler
+    function handleRowClick(event) {
+        console.log("Row click listener fired. Target:", event.target);
+        const row = event.target.closest('tr.clickable-row');
+        if (!row) {
+            console.log("Row click: Not inside a clickable row.");
+            return;
+        }
+        console.log("Row click: Found row:", row);
+
+        if (event.target.matches('input.item-checkbox, a.email-link, a.email-link *')) {
+            console.log("Row click: Click was on checkbox or link, ignoring.");
+            return;
+        }
+
+        const checkbox = row.querySelector('.item-checkbox');
+        if (checkbox) {
+            console.log("Row click: Found checkbox, toggling and calling handler.");
+            checkbox.checked = !checkbox.checked;
+            handleSingleCheckboxClick(checkbox); // Call the main handler
+        } else {
+            console.error("Row click: Could not find checkbox in row:", row);
+        }
+    }
+
+    // Select All handler
+    function handleSelectAllChange(event) {
+        console.log("Select All changed to:", event.target.checked);
+        const isChecked = event.target.checked;
+        itemCheckboxes.forEach(checkbox => {
+            checkbox.checked = isChecked;
+            const row = checkbox.closest('tr');
+            const emailId = row.dataset.id;
+            const link = row.dataset.link;
+            updateSelectionStorage(emailId, link, isChecked);
+        });
+        updateFixedFooter(); // Update footer after processing all
+    }
+
+    // Form submission handler
+    function prepareFormSubmission(event) {
+        const selectedEmails = getSelectedEmails();
+        const ids = Object.keys(selectedEmails);
+        const links = Object.values(selectedEmails);
+
+        document.getElementById('final-email-ids').value = ids.join(',');
+        document.getElementById('final-unsubscribe-links').value = links.join(',,,,,');
+
+        if (ids.length === 0) {
+            alert("Please select at least one email to unsubscribe.");
+            event.preventDefault();
+            return false;
+        }
+        setLoading('unsubscribe-button', 'Unsubscribing...');
+    }
+
+    // --- Sender Selection Handler (no changes needed here for counter/visibility) ---
+    function handleSenderSelection(checkbox, sender) {
+        const selectedEmails = getSelectedEmails(); // Get current state
+        const decodedSender = sender.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+
+        // This function is now called only *after* the initial checkbox is checked and storage updated
+        // So we just need to check if there are *other* emails to prompt for
+
+        const senderRows = emailListBody.querySelectorAll(`tr[data-sender="${sender}"]`);
+        const senderCheckboxes = [];
+        let uncheckedCount = 0;
+        senderRows.forEach(row => {
+            const cb = row.querySelector('input[type="checkbox"]');
+            if (cb && cb !== checkbox && !cb.checked) {
+                 uncheckedCount++;
+            }
+            if(cb) senderCheckboxes.push(cb); // Collect all checkboxes for this sender
+        });
+
+
+        if (uncheckedCount > 0) {
+            const totalFromSender = senderCheckboxes.length;
+            const message = `You selected an email from ${decodedSender}.\n\nThere are ${totalFromSender} email(s) from this sender in the list.\n\nDo you want to select all ${totalFromSender} emails from ${decodedSender}?`;
+
+            if (window.confirm(message)) {
+                senderCheckboxes.forEach(cb => {
+                    if (!cb.checked) {
+                        cb.checked = true;
+                        // Update storage for newly checked items
+                        const row = cb.closest('tr');
+                        const emailId = row.dataset.id;
+                        const link = row.dataset.link;
+                        selectedEmails[emailId] = link; // Add to our local copy
+                    }
+                });
+                saveSelectedEmails(selectedEmails); // Save the updated batch
+                updateFixedFooter(); // Update footer count/visibility
+
+                // Update Select All state if necessary
+                let allVisibleChecked = true;
+                itemCheckboxes.forEach(cb => { if (!cb.checked) allVisibleChecked = false; });
+                if (selectAllCheckbox) selectAllCheckbox.checked = allVisibleChecked;
+            }
+        }
+    }
+
+    // --- Initial Load ---
+    document.addEventListener('DOMContentLoaded', () => {
+        console.log("DOMContentLoaded event fired");
+        console.log("Document Referrer:", document.referrer); // DEBUG
+
+        // Find elements *after* DOM is loaded
+        fixedActionBar = document.getElementById('fixed-action-bar');
+        actionBarContent = document.getElementById('fixed-action-bar-content');
+        // selectedCountSpan will be found inside updateFixedFooter
+        selectAllCheckbox = document.getElementById('select-all-checkbox');
+        itemCheckboxes = document.querySelectorAll('.item-checkbox');
+        unsubscribeButton = document.getElementById('unsubscribe-button');
+        emailListBody = document.getElementById('email-list-body');
+
+        // Verify crucial elements needed for setup
+        if (!fixedActionBar) console.error("#fixed-action-bar not found!");
+        if (!actionBarContent) console.error("#fixed-action-bar-content not found!");
+        if (!emailListBody) console.error("#email-list-body not found!");
+        // unsubscribeButton check is implicitly done in updateFixedFooter
+
+        // *** Check if this is a page refresh/initial load vs pagination ***
+        const referrerUrl = document.referrer ? new URL(document.referrer) : null;
+        const currentUrl = new URL(window.location.href);
+        const isPagination = referrerUrl && referrerUrl.pathname === currentUrl.pathname; // Came from /scan
+
+        if (!isPagination) {
+            console.log("Referrer is not /scan or no referrer. Clearing selection storage.");
+            sessionStorage.removeItem(storageKey);
+        } else {
+            console.log("Referrer is /scan. Assuming pagination, keeping selection storage.");
+        }
+
+        // Move content to fixed bar (do this before updating footer)
+        if (fixedActionBar && actionBarContent && !fixedActionBar.contains(actionBarContent)) {
+            console.log("Moving actionBarContent to fixedActionBar on load");
+            fixedActionBar.appendChild(actionBarContent);
+        } else if (fixedActionBar && fixedActionBar.contains(actionBarContent)) {
+            console.log("actionBarContent already in fixedActionBar on load");
+        }
+
+        // Add event listeners
+        if (emailListBody) {
+            emailListBody.addEventListener('click', handleRowClick);
+        }
+        if (selectAllCheckbox) {
+            selectAllCheckbox.addEventListener('change', handleSelectAllChange);
+        }
+        // Form submit listener is already on the form element
+
+        // Load state and set initial UI *after* potential clearing
+        loadSelectionFromStorage();
+        updateFixedFooter(); // This sets visibility based on storage
+    });
+</script>
+{% endblock %} 
