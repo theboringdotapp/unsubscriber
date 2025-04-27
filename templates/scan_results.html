@@ -2,6 +2,85 @@
 
 {% block title %}Scan Results - Gmail Unsubscriber{% endblock %}
 
+{% block head_extra %}
+<style>
+    /* Checkmark animation styles */
+    .checkmark-container {
+        width: 80px;
+        height: 80px;
+        position: relative;
+    }
+    
+    .checkmark {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        display: block;
+        stroke-width: 2;
+        stroke: #1a7f37;
+        stroke-miterlimit: 10;
+        box-shadow: inset 0px 0px 0px #1a7f37;
+        animation: fill .4s ease-in-out .4s forwards, scale .3s ease-in-out .9s both;
+    }
+    
+    .checkmark-circle {
+        stroke-dasharray: 166;
+        stroke-dashoffset: 166;
+        stroke-width: 2;
+        stroke-miterlimit: 10;
+        stroke: #1a7f37;
+        fill: none;
+        animation: stroke 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+    }
+    
+    .checkmark-check {
+        transform-origin: 50% 50%;
+        stroke-dasharray: 48;
+        stroke-dashoffset: 48;
+        animation: stroke 0.3s cubic-bezier(0.65, 0, 0.45, 1) 0.8s forwards;
+    }
+    
+    @keyframes stroke {
+        100% {
+            stroke-dashoffset: 0;
+        }
+    }
+    
+    @keyframes scale {
+        0%, 100% {
+            transform: none;
+        }
+        50% {
+            transform: scale3d(1.1, 1.1, 1);
+        }
+    }
+    
+    @keyframes fill {
+        100% {
+            box-shadow: inset 0px 0px 0px 30px #eaffef;
+        }
+    }
+    
+    /* Modal overlay */
+    .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 100;
+    }
+    
+    .modal-hidden {
+        display: none;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="card-bg rounded-lg overflow-hidden">
     <div class="px-6 py-4 border-b border-[var(--border-color)]">
@@ -9,7 +88,7 @@
     </div>
 
     {% if emails %}
-        <form class="action-form" id="unsubscribe-form" action="{{ url_for('unsubscribe_and_archive') }}" method="post" onsubmit="prepareFormSubmission(event)">
+        <form class="action-form" id="unsubscribe-form" action="{{ url_for('unsubscribe_and_archive') }}" method="post" onsubmit="handleUnsubscribeSubmit(event)">
             <input type="hidden" name="final_email_ids" id="final-email-ids">
             <input type="hidden" name="final_unsubscribe_links" id="final-unsubscribe-links">
 
@@ -61,6 +140,13 @@
     {% endif %}
 </div>
 
+<!-- Modal for unsubscribe results -->
+<div id="result-modal" class="modal-overlay modal-hidden">
+    <div id="unsubscribe-results" class="bg-white rounded-lg p-6 shadow-xl max-w-md w-full">
+        <!-- Content will be replaced by the AJAX response -->
+    </div>
+</div>
+
 <!-- Spacer div that will dynamically adjust its height when the action bar appears -->
 <div id="footer-spacer" class="h-0 transition-all duration-200"></div>
 
@@ -72,7 +158,7 @@
             id="unsubscribe-button" 
             class="inline-flex items-center justify-center px-5 py-2 text-sm font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--accent-color)] bg-gradient-to-r from-[#0969da] to-[#8250df] text-white hover:translate-y-[-2px] hover:shadow-md transition-all duration-200" 
             disabled>
-        <span id="selected-count">0 </span> Email(s) Selected - Unsubscribe & Archive
+        Unsubscribe & Archive <span id="selected-count" class="font-bold mx-1">0</span> Emails
     </button>
 </div>
 
@@ -89,6 +175,8 @@
     let unsubscribeButton = null;   // Initialize as null
     let emailListBody = null;       // Initialize as null
     let footerSpacer = null;        // Initialize as null
+    let resultModal = null;         // Initialize as null
+    let processedEmailIds = new Set(); // Track processed emails
 
     // --- Storage Management ---
     function getSelectedEmails() {
@@ -249,22 +337,136 @@
         updateFixedFooter(); // Update footer after processing all
     }
 
-    // Form submission handler
-    function prepareFormSubmission(event) {
+    // Form submission handler - Now with AJAX
+    function handleUnsubscribeSubmit(event) {
+        event.preventDefault(); // Prevent normal form submission
+        
         const selectedEmails = getSelectedEmails();
         const ids = Object.keys(selectedEmails);
         const links = Object.values(selectedEmails);
 
-        // Fix: Format data as simple comma-separated strings instead of trying to create JSON
         document.getElementById('final-email-ids').value = ids.join(',');
         document.getElementById('final-unsubscribe-links').value = links.join(',,,,,'); // Use five commas as delimiter to avoid URL conflicts
 
         if (ids.length === 0) {
             alert("Please select at least one email to unsubscribe.");
-            event.preventDefault();
             return false;
         }
+        
+        // Store processed IDs for later removal
+        ids.forEach(id => processedEmailIds.add(id));
+        
+        // Show loading state
         setLoading('unsubscribe-button', 'Unsubscribing...');
+        
+        // Show the modal immediately with a loading state
+        if (resultModal) {
+            document.getElementById('unsubscribe-results').innerHTML = `
+                <div class="text-center">
+                    <div class="inline-block rounded-full border-4 border-t-transparent border-[var(--accent-color)] border-solid h-12 w-12 animate-spin mb-4"></div>
+                    <p class="text-gray-600">Processing your request...</p>
+                </div>
+            `;
+            resultModal.classList.remove('modal-hidden');
+        }
+        
+        // Submit the form with AJAX
+        const form = document.getElementById('unsubscribe-form');
+        const formData = new FormData(form);
+        
+        // Add a header to indicate this is an AJAX/HTMX request
+        fetch(form.action, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'HX-Request': 'true' // This tells the server it's an HTMX request
+            }
+        })
+        .then(response => response.text())
+        .then(html => {
+            // Show the result modal with the response HTML
+            if (resultModal) {
+                document.getElementById('unsubscribe-results').innerHTML = html;
+            }
+            
+            // Reset loading state
+            if (unsubscribeButton) {
+                hideLoading('unsubscribe-button');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            
+            // Show error in the modal
+            if (resultModal) {
+                document.getElementById('unsubscribe-results').innerHTML = `
+                    <div class="bg-white rounded-lg p-6 text-center flex flex-col items-center">
+                        <div class="error-container mb-4">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-red-500" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                            </svg>
+                        </div>
+                        <h3 class="text-xl font-semibold text-red-600 mb-2">Error</h3>
+                        <p class="text-gray-600">An error occurred while processing your request.</p>
+                        <button class="mt-4 px-4 py-2 bg-[var(--accent-color)] text-white rounded-md hover:bg-[var(--accent-hover)]" onclick="window.closeErrorMessage()">Close</button>
+                    </div>
+                `;
+            }
+            
+            // Reset loading state
+            if (unsubscribeButton) {
+                hideLoading('unsubscribe-button');
+            }
+        });
+    }
+    
+    // Function to remove processed emails from list
+    function removeProcessedEmails() {
+        console.log("removeProcessedEmails called");
+        if (processedEmailIds.size === 0) {
+            // No emails to remove
+            if (resultModal) {
+                resultModal.classList.add('modal-hidden');
+            }
+            return;
+        }
+        
+        // Remove rows for processed emails
+        processedEmailIds.forEach(emailId => {
+            const row = document.querySelector(`tr[data-id="${emailId}"]`);
+            if (row) {
+                // Add animation class
+                row.classList.add('fade-out');
+                // Remove from the DOM after animation completes
+                setTimeout(() => {
+                    row.remove();
+                }, 500);
+                
+                // Also remove from storage
+                const selectedEmails = getSelectedEmails();
+                delete selectedEmails[emailId];
+                saveSelectedEmails(selectedEmails);
+            }
+        });
+        
+        // Clear processed IDs
+        processedEmailIds.clear();
+        
+        // Update button state
+        updateFixedFooter();
+        
+        // Hide modal
+        if (resultModal) {
+            resultModal.classList.add('modal-hidden');
+        }
+    }
+    
+    // Function to close error message
+    function closeErrorMessage() {
+        console.log("closeErrorMessage called");
+        if (resultModal) {
+            resultModal.classList.add('modal-hidden');
+        }
     }
 
     // --- Sender Selection Handler (no changes needed here for counter/visibility) ---
@@ -322,6 +524,7 @@
         fixedActionBar = document.getElementById('fixed-action-bar');
         actionBarContent = document.getElementById('fixed-action-bar-content');
         footerSpacer = document.getElementById('footer-spacer');
+        resultModal = document.getElementById('result-modal');
         // selectedCountSpan will be found inside updateFixedFooter
         selectAllCheckbox = document.getElementById('select-all-checkbox');
         itemCheckboxes = document.querySelectorAll('.item-checkbox');
@@ -333,6 +536,7 @@
         if (!actionBarContent) console.error("#fixed-action-bar-content not found!");
         if (!emailListBody) console.error("#email-list-body not found!");
         if (!footerSpacer) console.error("#footer-spacer not found!");
+        if (!resultModal) console.error("#result-modal not found!");
         // unsubscribeButton check is implicitly done in updateFixedFooter
 
         // *** Check if this is a page refresh/initial load vs pagination ***
@@ -367,6 +571,24 @@
         // Load state and set initial UI *after* potential clearing
         loadSelectionFromStorage();
         updateFixedFooter(); // This sets visibility based on storage
+        
+        // Make functions globally available (required for the modal buttons)
+        window.removeProcessedEmails = removeProcessedEmails;
+        window.closeErrorMessage = closeErrorMessage;
     });
+    
+    // Add fade-out animation style
+    document.head.insertAdjacentHTML('beforeend', `
+        <style>
+            @keyframes fadeOut {
+                from { opacity: 1; }
+                to { opacity: 0; }
+            }
+            
+            .fade-out {
+                animation: fadeOut 0.5s forwards;
+            }
+        </style>
+    `);
 </script>
 {% endblock %} 

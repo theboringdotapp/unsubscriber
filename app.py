@@ -413,8 +413,12 @@ def unsubscribe_and_archive():
     # Check if this is an HTMX request
     is_htmx_request = request.headers.get('HX-Request') == 'true'
     
+    print("\n==== UNSUBSCRIBE REQUEST STARTED ====")
+    print(f"Time: {__import__('datetime').datetime.now()}")
+    
     service = get_gmail_service()
     if not service:
+        print("ERROR: Gmail service not available - authentication required")
         flash("Please login first", "warning")
         return redirect(url_for('index'))
         
@@ -423,12 +427,18 @@ def unsubscribe_and_archive():
         email_ids = request.form.get('final_email_ids', '')
         unsubscribe_links = request.form.get('final_unsubscribe_links', '')
         
+        print(f"Received email_ids: {email_ids}")
+        print(f"Received unsubscribe_links: {unsubscribe_links}")
+        
         # Parse comma-separated values from the form data
         email_ids = email_ids.split(',') if email_ids else []
         # Split by five commas to handle URLs that might contain commas
         unsubscribe_links = unsubscribe_links.split(',,,,,') if unsubscribe_links else []
         
+        print(f"Parsed {len(email_ids)} email IDs and {len(unsubscribe_links)} unsubscribe links")
+        
         if not email_ids or not unsubscribe_links:
+            print("ERROR: No emails selected")
             flash("No emails selected", "warning")
             if is_htmx_request:
                 return render_template('partials/unsubscribe_result.html', success=False, message="No emails selected")
@@ -437,32 +447,46 @@ def unsubscribe_and_archive():
         # Process each unsubscribe link and archive the email
         results = []
         for i, (email_id, link) in enumerate(zip(email_ids, unsubscribe_links)):
+            print(f"\nProcessing email {i+1}/{len(email_ids)}:")
+            print(f"  ID: {email_id}")
+            print(f"  Link: {link}")
+            
             try:
                 # Visit the unsubscribe link
                 if not MOCK_API:
+                    print(f"  Sending GET request to: {link}")
                     response = requests.get(link, timeout=5)  # Set a reasonable timeout
                     status = response.status_code
+                    print(f"  Response status: {status}")
                 else:
                     # Mock a successful request
                     status = 200
+                    print(f"  MOCK MODE: Simulating successful GET request (status 200)")
                 
                 # Archive the email
                 if not MOCK_API:
+                    print(f"  Archiving email (removing from INBOX)")
                     service.users().messages().modify(
                         userId='me',
                         id=email_id,
                         body={'removeLabelIds': ['INBOX']}
                     ).execute()
+                    print(f"  Email successfully archived")
+                else:
+                    print(f"  MOCK MODE: Simulating successful archive")
                 
                 # Record the result
+                success = 200 <= status < 300  # HTTP success status range
                 results.append({
                     'email_id': email_id,
                     'status': status,
-                    'success': 200 <= status < 300  # HTTP success status range
+                    'success': success
                 })
+                print(f"  Result: {'SUCCESS' if success else 'FAILED'}")
                 
             except Exception as e:
                 # Record the failure
+                print(f"  ERROR: {str(e)}")
                 results.append({
                     'email_id': email_id,
                     'status': 'Error',
@@ -471,8 +495,10 @@ def unsubscribe_and_archive():
                 })
         
         success_count = sum(1 for result in results if result.get('success', False))
+        print(f"\nProcessed {len(results)} unsubscribe requests. {success_count} succeeded, {len(results) - success_count} failed.")
         
         if is_htmx_request:
+            print("Returning HTMX response")
             return render_template(
                 'partials/unsubscribe_result.html',
                 success=True,
@@ -482,15 +508,21 @@ def unsubscribe_and_archive():
             )
         
         # Flash a message with the results
-        flash(f"Processed {len(results)} unsubscribe requests. {success_count} succeeded.", 
-              "success" if success_count == len(results) else "info")
+        message = f"Processed {len(results)} unsubscribe requests. {success_count} succeeded."
+        status = "success" if success_count == len(results) else "info"
+        print(f"Flashing message: {message} (status: {status})")
+        flash(message, status)
         
+        print("==== UNSUBSCRIBE REQUEST COMPLETED ====\n")
         # Clear the session storage by returning JavaScript
         # This doesn't need to be done for HTMX requests, as we'll handle it in the template
         return redirect(url_for('index'))
         
     except Exception as e:
-        flash(f"Error processing unsubscribe requests: {e}", "error")
+        error_msg = f"Error processing unsubscribe requests: {e}"
+        print(f"ERROR: {error_msg}")
+        print("==== UNSUBSCRIBE REQUEST FAILED ====\n")
+        flash(error_msg, "error")
         if is_htmx_request:
             return render_template('partials/unsubscribe_result.html', success=False, message=f"Error: {e}")
         return redirect(url_for('index'))
