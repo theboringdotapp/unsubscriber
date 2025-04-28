@@ -282,16 +282,18 @@
                     </div>
                 </div>
                 
+                {# Add the pagination button block here #}
                 {% if next_page_token %}
-                <div class="px-6 py-4 text-right">
+                <div class="px-6 py-4 text-right border-t border-[var(--border-color)] mt-4">
                     <a href="{{ url_for('scan_emails', token=next_page_token) }}" 
                        id="next-page-button" 
-                       onclick="setLoading('next-page-button', 'Loading...')" 
+                       onclick="setLoading('next-page-button', 'Loading Next...')" 
                        class="glass-button inline-flex items-center px-4 py-2 text-sm font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--accent-color)]">
                         Next Page
                     </a>
                 </div>
                 {% endif %}
+                {# End pagination button block #}
             </form>
         {% else %}
             <div class="px-6 py-4">

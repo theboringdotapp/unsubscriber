@@ -26,6 +26,7 @@ if not SECRET_KEY:
     print("WARNING: FLASK_SECRET_KEY environment variable not set. Using insecure default for local dev ONLY.")
     SECRET_KEY = 'dev-secret-key-replace-this-in-production' # Insecure default
 app.secret_key = SECRET_KEY
+print(f"--- Flask App Initialized. Using Secret Key: {app.secret_key[:5]}...{app.secret_key[-5:] if len(app.secret_key) > 10 else ''} ---") # DEBUG: Confirm key usage
 
 # Google API Scopes
 SCOPES = ['https://www.googleapis.com/auth/gmail.modify'] # Read, modify (for archiving), send
@@ -236,17 +237,30 @@ def get_google_auth_flow():
 
 def save_credentials(creds):
     """Saves credentials to the session."""
-    session['credentials'] = pickle.dumps(creds).decode('latin1') # Store pickled creds as string
+    try:
+        session['credentials'] = pickle.dumps(creds).decode('latin1') # Store pickled creds as string
+        print("--- DEBUG: save_credentials: Successfully pickled and stored credentials in session. ---")
+    except Exception as e:
+        print(f"--- DEBUG: save_credentials: ERROR pickling/storing credentials: {e} ---")
 
 def load_credentials():
     """Loads credentials from the session."""
-    if 'credentials' in session:
+    print("--- DEBUG: load_credentials: Attempting to load credentials from session. ---")
+    creds_pickle = session.get('credentials')
+    if creds_pickle:
+        print("--- DEBUG: load_credentials: Found 'credentials' key in session. Attempting to unpickle. ---")
         try:
-            return pickle.loads(session['credentials'].encode('latin1'))
+            creds = pickle.loads(creds_pickle.encode('latin1'))
+            print("--- DEBUG: load_credentials: Successfully unpickled credentials. ---")
+            return creds
         except Exception as e:
-            print(f"Error loading credentials from session: {e}")
+            print(f"--- DEBUG: load_credentials: ERROR unpickling credentials: {e} ---")
+            # Optionally clear the corrupted session data
+            session.pop('credentials', None)
             return None
-    return None
+    else:
+        print("--- DEBUG: load_credentials: 'credentials' key NOT found in session. ---")
+        return None
 
 def clear_credentials():
      """Clears credentials from the session."""
@@ -258,39 +272,45 @@ def clear_credentials():
 
 def get_gmail_service():
     """Creates and returns a Gmail API service instance using session storage."""
+    print("--- DEBUG: get_gmail_service: Attempting to get service. --- ")
     creds = load_credentials()
 
+    if not creds:
+        print("--- DEBUG: get_gmail_service: load_credentials returned None. Returning None. --- ")
+        return None # Already logged reason inside load_credentials
+
+    print(f"--- DEBUG: get_gmail_service: Credentials loaded. Valid: {creds.valid}, Expired: {creds.expired}, Has Refresh Token: {bool(creds.refresh_token)} ---")
+
     # If there are no (valid) credentials available, return None to trigger login flow.
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
+    if not creds.valid:
+        print("--- DEBUG: get_gmail_service: Credentials are not valid. Checking refresh token... ---")
+        if creds.expired and creds.refresh_token:
+            print("--- DEBUG: get_gmail_service: Credentials expired and refresh token exists. Attempting refresh... ---")
             try:
-                print("Attempting to refresh token...")
                 creds.refresh(Request())
+                print("--- DEBUG: get_gmail_service: Token refreshed successfully. Saving new credentials. ---")
                 save_credentials(creds) # Save the refreshed credentials
-                print("Token refreshed successfully.")
             except Exception as e:
                 flash(f"Error refreshing credentials: {e}. Please re-authenticate.", "error")
-                print(f"Token refresh failed: {e}")
+                print(f"--- DEBUG: get_gmail_service: Token refresh FAILED: {e} ---")
                 clear_credentials() # Clear bad credentials
                 return None # Force re-authentication
         else:
             # Credentials not found, invalid, or no refresh token
-            if creds:
-                print("Credentials found but invalid/expired and no refresh token.")
-            else:
-                print("No credentials found in session.")
+            print("--- DEBUG: get_gmail_service: Credentials invalid/expired OR no refresh token. Clearing credentials and returning None. ---")
             clear_credentials() # Ensure clean state
             return None # Indicate that authentication is needed
 
     # If we reach here, creds should be valid (either loaded or refreshed)
+    print("--- DEBUG: get_gmail_service: Credentials appear valid. Building Gmail service... ---")
     try:
         # Disable discovery cache for Vercel's ephemeral filesystem
         service = build('gmail', 'v1', credentials=creds, cache_discovery=False)
-        print("Gmail service built successfully.")
+        print("--- DEBUG: get_gmail_service: Gmail service built successfully. Returning service object. ---")
         return service
     except Exception as e:
         flash(f"Error building Gmail service: {e}", "error")
-        print(f"Error building Gmail service: {e}")
+        print(f"--- DEBUG: get_gmail_service: ERROR building Gmail service: {e}. Returning None. ---")
         return None
 
 
@@ -435,18 +455,25 @@ def oauth2callback():
         # Important for environments behind proxies or complex routing
         authorization_response = request.url
         # Google might require https, handle potential issues if running locally on http
-        if BASE_URL.startswith('http://') and '127.0.0.1' in BASE_URL:
-            print("WARNING: Local development detected (http). Replacing with https for Google's check.")
-            # This is a workaround, Google might still complain depending on client settings
-            authorization_response = authorization_response.replace('http://', 'https://', 1)
+        if BASE_URL.startswith('http://') and ('127.0.0.1' in BASE_URL or 'localhost' in BASE_URL):
+            # Check if running via vercel dev which might handle proxying correctly
+            # Vercel dev often sets headers like x-forwarded-proto
+            forwarded_proto = request.headers.get('x-forwarded-proto')
+            if forwarded_proto == 'https':
+                 print("--- DEBUG: oauth2callback: Detected x-forwarded-proto=https, using original request.url ---")
+                 # Keep original authorization_response
+            else:
+                 print("--- DEBUG: oauth2callback: Local HTTP detected. Replacing http:// with https:// for Google check. ---")
+                 # This is a workaround, Google might still complain depending on client settings
+                 authorization_response = authorization_response.replace('http://', 'https://', 1)
 
-        print(f"Fetching token with authorization_response: {authorization_response}") # Debugging
+        print(f"--- DEBUG: oauth2callback: Fetching token with authorization_response: {authorization_response} ---") # Debugging
         flow.fetch_token(authorization_response=authorization_response)
-        print("Token fetched successfully.") # Debugging
+        print("--- DEBUG: oauth2callback: Token fetched successfully. ---") # Debugging
 
         creds = flow.credentials
         save_credentials(creds) # Save credentials to session
-        print("Credentials saved to session.") # Debugging
+        print("--- DEBUG: oauth2callback: Credentials theoretically saved to session. ---") # Debugging
         session.pop('oauth_state', None) # Clean up state
 
         flash("Authentication successful!", "success")
@@ -469,51 +496,49 @@ def logout():
     return redirect(url_for('index'))
 
 
-MAX_SCAN_EMAILS = 50 # Limit number of emails to process per scan request
+# Limit number of emails to process per scan request
 
+# Modify route to accept token from query args
 @app.route('/scan', methods=['GET'])
 def scan_emails():
-    """Scans recent emails for unsubscribe links."""
+    """Scans recent emails for unsubscribe links, supporting pagination."""
     print("--- SCAN ROUTE START ---") # DEBUG
+    page_token = request.args.get('token', None) # Get token for the current page
+    print(f"--- SCAN ROUTE: Received page token: {page_token} ---") # DEBUG
+
     service = get_gmail_service()
     if not service:
         flash("Authentication required.", "warning")
         print("Scan route: Not authenticated.") # DEBUG
         return redirect(url_for('login'))
+    
+    authenticated = True 
 
-    found_subscriptions = {} # Store {sender: link}
-    processed_count = 0
-    next_page_token = None
+    found_subscriptions = {} 
+    # We don't need processed_count for simple pagination based on API pages
+    next_page_token = None # Initialize next page token
 
     try:
-        print("Starting email fetch loop.") # DEBUG
-        while processed_count < MAX_SCAN_EMAILS:
-            if MOCK_API:
-                list_response = _get_mock_message_list(page_token=next_page_token)
-            else:
-                 # Fetch only messages that are likely bulk/promotions (adjust query as needed)
-                 # Consider adding `labelIds: ['CATEGORY_PROMOTIONS']` or similar
-                 # Query for common unsubscribe phrases might be too broad
-                list_response = service.users().messages().list(
-                    userId='me',
-                    maxResults=min(20, MAX_SCAN_EMAILS - processed_count), # Fetch smaller batches
-                    pageToken=next_page_token,
-                    q='unsubscribe' # Simple query, might need refinement
-                    # q='label:^ubme OR label:^nu OR category:promotions OR category:social OR category:updates' # More complex example
-                ).execute()
-            print(f"List response (page): {list_response}") # DEBUG
+        print("Fetching email page.") # DEBUG
+        
+        if MOCK_API:
+             list_response = _get_mock_message_list(page_token=page_token)
+        else:
+            list_response = service.users().messages().list(
+                userId='me',
+                maxResults=20, # Consistent page size
+                pageToken=page_token, # Use the incoming token
+                q='unsubscribe' 
+            ).execute()
+        # print(f"List response (page): {list_response}") # DEBUG
 
-            messages = list_response.get('messages', [])
-            if not messages:
-                print("No more messages found matching query.") # DEBUG
-                break # Exit loop if no messages
-
+        messages = list_response.get('messages', [])
+        if not messages:
+            print("No messages found on this page.") # DEBUG
+        else:
             for message_stub in messages:
-                if processed_count >= MAX_SCAN_EMAILS:
-                    break # Stop if we hit the overall limit
-
                 msg_id = message_stub['id']
-                print(f"Processing message ID: {msg_id}") # DEBUG
+                # print(f"Processing message ID: {msg_id}") # DEBUG - Commented out for clarity
 
                 if MOCK_API:
                     full_message = _get_mock_message_details(msg_id)
@@ -523,62 +548,55 @@ def scan_emails():
                         userId='me', id=msg_id, format='metadata', # metadata includes headers
                         metadataHeaders=['List-Unsubscribe', 'From', 'Subject']
                     ).execute()
-                # print(f"Full message details (metadata): {full_message}") # DEBUG - Can be verbose
 
                 unsubscribe_link, link_type = find_unsubscribe_links(full_message)
 
                 if unsubscribe_link:
-                    print(f"Found link ({link_type}): {unsubscribe_link}") # DEBUG
+                    # print(f"Found link ({link_type}): {unsubscribe_link}") # DEBUG - Commented out for clarity
                     # Extract sender info
                     headers = full_message.get('payload', {}).get('headers', [])
                     sender = next((h['value'] for h in headers if h['name'].lower() == 'from'), 'Unknown Sender')
                     subject = next((h['value'] for h in headers if h['name'].lower() == 'subject'), 'No Subject')
-
-                    # Try to get a cleaner sender name (e.g., "Sender Name" from "Sender Name <email@addr>")
                     if '<' in sender and '>' in sender:
                         clean_sender = sender[:sender.find('<')].strip().replace('"', '')
-                        if not clean_sender: # If only email was in <>
+                        if not clean_sender: 
                              clean_sender = sender[sender.find('<')+1:sender.find('>')]
                     else:
-                        clean_sender = sender # Use as is if no brackets
+                        clean_sender = sender 
 
                     # Store details for each email, grouped by sender
                     email_data = {
                          "link": unsubscribe_link,
                          "type": link_type,
-                         "full_sender": sender, # Store original sender string for potential display
+                         "full_sender": sender,
                          "subject": subject,
-                         "message_id": msg_id # Need the ID for actions
+                         "message_id": msg_id
                     }
 
                     if clean_sender not in found_subscriptions:
                         found_subscriptions[clean_sender] = [email_data] # Initialize list for new sender
-                        print(f"Added first email for sender: {clean_sender} -> Subject: {subject}") # DEBUG
+                        # print(f"Added first email for sender: {clean_sender} -> Subject: {subject}") # DEBUG - Commented out
                     else:
                         found_subscriptions[clean_sender].append(email_data) # Append to existing list
-                        print(f"Added another email for sender: {clean_sender} -> Subject: {subject}") # DEBUG
+                        # print(f"Added another email for sender: {clean_sender} -> Subject: {subject}") # DEBUG - Commented out
+        
+        # Get the token for the *next* page from the API response
+        next_page_token = list_response.get('nextPageToken')
+        print(f"--- SCAN ROUTE: Next page token from API: {next_page_token} ---") # DEBUG
 
-                processed_count += 1
-
-            next_page_token = list_response.get('nextPageToken')
-            if not next_page_token:
-                print("No next page token received.") # DEBUG
-                break # Exit loop if no more pages
-
-        print(f"Scan finished. Processed {processed_count} emails. Found {len(found_subscriptions)} unique senders.") # DEBUG
+        print(f"Scan finished for this page. Found {len(found_subscriptions)} unique senders on this page.") # DEBUG
 
     except Exception as e:
         flash(f"An error occurred during email scan: {e}", "error")
         print(f"!!! ERROR during scan loop: {e} !!!") # DEBUG
-        # Render template even on error, showing potentially partial results
-        return render_template('scan_results.html', emails=found_subscriptions, error=str(e))
+        # Pass tokens even on error to potentially allow navigation
+        return render_template('scan_results.html', emails=found_subscriptions, error=str(e), authenticated=authenticated, current_page_token=page_token, next_page_token=next_page_token)
 
+    if not found_subscriptions and not page_token: # Show flash only on empty first page
+        flash("No emails with unsubscribe links found in the initial scan.", "info")
 
-    if not found_subscriptions:
-        flash("No emails with unsubscribe links found in the recent scan.", "info")
-
-    # Pass the found subscriptions to the template
-    return render_template('scan_results.html', emails=found_subscriptions)
+    # Pass the emails for this page, auth status, and pagination tokens
+    return render_template('scan_results.html', emails=found_subscriptions, authenticated=authenticated, current_page_token=page_token, next_page_token=next_page_token)
 
 
 @app.route('/unsubscribe', methods=['POST'])
