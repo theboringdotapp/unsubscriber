@@ -455,7 +455,13 @@
         if (count > 0) {
             actionBar.innerHTML = `
                 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center">
-                    <span class="text-sm font-medium text-foreground">${count} email${count > 1 ? 's' : ''} selected</span>
+                    <div class="flex items-center space-x-3">
+                        <span class="text-sm font-medium text-foreground">${count} email${count > 1 ? 's' : ''} selected</span>
+                        <button type="button" onclick="resetSelection()" class="btn btn-ghost btn-sm text-muted-foreground hover:text-foreground hover:bg-muted focus-ring p-1">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-1"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
+                            Reset
+                        </button>
+                    </div>
                     <div class="flex items-center space-x-3">
                         <label for="archive-toggle" class="flex items-center text-sm text-muted-foreground">
                             <input type="checkbox" id="archive-toggle" name="archive" checked class="form-checkbox h-4 w-4 text-brand border-border rounded focus:ring-brand mr-2">
@@ -665,6 +671,32 @@
                 Close
             </button>
         </div>`;
+    }
+
+    function resetSelection() {
+        console.log("Resetting selection...");
+        // Clear storage
+        saveSelectedEmailsToStorage([]);
+        
+        // Uncheck all visible checkboxes
+        document.querySelectorAll('.email-checkbox:checked').forEach(cb => {
+            cb.checked = false;
+        });
+        document.querySelectorAll('.sender-checkbox:checked').forEach(cb => {
+            cb.checked = false;
+            cb.indeterminate = false; // Reset indeterminate state
+        });
+        
+        // Remove visual selection state from visible rows/groups
+        document.querySelectorAll('.email-selected').forEach(row => {
+            row.classList.remove('email-selected');
+        });
+        document.querySelectorAll('.sender-selected').forEach(group => {
+            group.classList.remove('sender-selected');
+        });
+        
+        // Update the action bar (which will now hide itself)
+        updateActionBar();
     }
 
 </script>
