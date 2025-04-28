@@ -172,7 +172,11 @@ def scan_emails():
              list_response = _get_mock_message_list(page_token=page_token)
         else:
             list_response = service.users().messages().list(
-                userId='me', maxResults=20, pageToken=page_token, q='unsubscribe'
+                userId='me', 
+                maxResults=20, 
+                pageToken=page_token, 
+                q='unsubscribe',
+                labelIds=['INBOX']
             ).execute()
 
         messages = list_response.get('messages', [])
@@ -285,3 +289,52 @@ def unsubscribe_and_archive():
              else: flash(f"Email sent for {sender}! Email { 'archived' if should_archive else 'kept'}.", "success")
         else: flash(error_message, "error") # Flash error only if non-AJAX
         return redirect(url_for('index')) 
+
+# --- New Route for Archiving --- 
+@scan_bp.route('/archive', methods=['POST'])
+def archive_emails():
+    """Archives a list of emails provided by message IDs."""
+    print("--- ARCHIVE ROUTE START ---")
+    service = utils.get_gmail_service()
+    if not service:
+         # Return JSON error for AJAX
+        return {"success": False, "error": "Authentication required."}, 401
+
+    data = request.get_json()
+    if not data or 'message_ids' not in data:
+        print("Archive route: Missing message_ids in JSON payload")
+        return {"success": False, "error": "Missing message_ids"}, 400
+
+    message_ids = data['message_ids']
+    if not isinstance(message_ids, list):
+        print("Archive route: message_ids is not a list")
+        return {"success": False, "error": "message_ids must be a list"}, 400
+        
+    print(f"Archive route: Received {len(message_ids)} IDs to archive.")
+
+    success_count = 0
+    fail_count = 0
+    errors = []
+
+    for msg_id in message_ids:
+        try:
+            # print(f"Attempting to archive {msg_id}")
+            service.users().messages().modify(
+                userId='me',
+                id=msg_id,
+                body={'removeLabelIds': ['INBOX']} 
+            ).execute()
+            success_count += 1
+        except Exception as e:
+            fail_count += 1
+            error_detail = f"Failed to archive {msg_id}: {e}"
+            print(f"!!! ERROR: {error_detail} !!!")
+            errors.append(error_detail)
+
+    print(f"Archive route: Finished. Success: {success_count}, Failed: {fail_count}")
+    if fail_count > 0:
+         return {"success": False, "error": f"Completed with {fail_count} errors.", "details": errors}, 500
+    else:
+        return {"success": True, "message": f"Successfully archived {success_count} emails."}, 200
+
+# --- End New Route --- 
