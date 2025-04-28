@@ -17,7 +17,17 @@
         background-color: hsl(var(--card)); /* Use card background */
         box-shadow: var(--shadow-sm); /* Add subtle shadow */
         /* overflow: hidden; */ /* Removed this to allow tooltip overflow */
+        opacity: 0;
+        transform: translateY(10px);
+        animation: fadeInUp 0.5s ease forwards;
     }
+    
+    /* Stagger the animation for sender groups */
+    .sender-group:nth-child(1) { animation-delay: 0.1s; }
+    .sender-group:nth-child(2) { animation-delay: 0.2s; }
+    .sender-group:nth-child(3) { animation-delay: 0.3s; }
+    .sender-group:nth-child(4) { animation-delay: 0.4s; }
+    .sender-group:nth-child(5) { animation-delay: 0.5s; }
     
     .sender-header {
         padding: 0.75rem 1rem;
@@ -79,8 +89,10 @@
         justify-content: space-between;
         align-items: center;
         border-bottom: 1px solid hsl(var(--border));
-        transition: background-color 0.15s ease-in-out;
+        transition: all 0.2s ease;
         cursor: pointer; /* Added pointer cursor */
+        position: relative;
+        overflow: hidden;
     }
 
     .email-row:last-child {
@@ -89,6 +101,22 @@
 
     .email-row:hover {
          background-color: hsl(var(--muted));
+    }
+    
+    .email-row:hover::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, hsla(var(--brand), 0.05), transparent);
+        transform: translateX(-100%);
+        animation: shimmer 1s ease-out;
+    }
+    
+    @keyframes shimmer {
+        100% { transform: translateX(100%); }
     }
 
     .email-selected {
@@ -187,11 +215,50 @@
     #fixed-action-bar {
         padding: 1rem; /* Adjust padding */
         /* Background and border inherited from base.html */
+        transform: translateY(20px);
+        opacity: 0;
+        transition: all 0.4s ease;
+    }
+    
+    #fixed-action-bar.visible {
+        transform: translateY(0);
+        opacity: 1;
     }
     
     /* Ensure action bar buttons use new styles */
     #fixed-action-bar .btn {
         /* Style specific buttons if needed */
+    }
+    
+    /* Animation keyframes */
+    @keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    @keyframes scaleIn {
+        from { transform: scale(0.95); opacity: 0; }
+        to { transform: scale(1); opacity: 1; }
+    }
+    
+    /* Title animations */
+    h1, .subtitle {
+        opacity: 0;
+        animation: fadeInUp 0.5s ease forwards;
+    }
+    
+    h1 { animation-delay: 0.1s; }
+    .subtitle { animation-delay: 0.2s; }
+    
+    /* Button pulse effect */
+    @keyframes buttonPulse {
+        0% { box-shadow: 0 0 0 0 hsla(var(--brand), 0.5); }
+        70% { box-shadow: 0 0 0 10px hsla(var(--brand), 0); }
+        100% { box-shadow: 0 0 0 0 hsla(var(--brand), 0); }
+    }
+    
+    .btn-pulse {
+        animation: buttonPulse 2s infinite;
     }
 
 </style>
@@ -202,11 +269,11 @@
 
     <div class="mb-8 text-center">
         <h1 class="text-3xl font-bold text-foreground">Scan Results</h1>
-        <p class="text-muted-foreground mt-2">Found potential subscriptions. Select emails to unsubscribe or archive.</p>
+        <p class="text-muted-foreground mt-2 subtitle">Found potential subscriptions. Select emails to unsubscribe or archive.</p>
     </div>
 
     {% if not subscriptions %}
-        <div class="card p-6 text-center">
+        <div class="card p-6 text-center" style="opacity: 0; animation: scaleIn 0.5s ease forwards; animation-delay: 0.3s;">
             <p class="text-muted-foreground">No emails with unsubscribe links found in the last {{ config.MAX_SCAN_EMAILS }} scanned messages.</p>
             <a href="{{ url_for('index') }}" class="btn btn-secondary mt-4 focus-ring">Back Home</a>
         </div>
@@ -272,7 +339,7 @@
                     <a href="{{ url_for('scan.scan_emails', token=next_page_token) }}"
                        id="scan-more-button"
                        onclick="setLoading('scan-more-button', 'Loading More...')"
-                       class="btn btn-outline btn-md focus-ring">
+                       class="btn btn-outline btn-md focus-ring btn-pulse">
                         Load More Results
                     </a>
                 </div>
@@ -285,6 +352,28 @@
 <div id="result-modal" class="modal-overlay modal-hidden">
     <div id="modal-content" class="card max-w-md w-full shadow-lg">
         <!-- Content will be loaded here via HTMX or JS -->
+    </div>
+</div>
+
+<!-- Fixed Action Bar for batch operations -->
+<div id="fixed-action-bar" class="fixed bottom-0 left-0 right-0 bg-background border-t border-border shadow-md z-50 hidden">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center">
+        <div class="flex items-center space-x-3">
+            <span id="action-count" class="text-sm font-medium text-foreground">0 emails selected</span>
+            <button type="button" onclick="resetSelection()" class="btn btn-ghost btn-sm text-muted-foreground hover:text-foreground hover:bg-muted focus-ring p-1">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-1"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
+                Reset
+            </button>
+        </div>
+        <div class="flex items-center space-x-3">
+            <label for="archive-toggle" class="flex items-center text-sm text-muted-foreground">
+                <input type="checkbox" id="archive-toggle" name="archive" checked class="form-checkbox h-4 w-4 text-brand border-border rounded focus:ring-brand mr-2">
+                Also archive selected?
+            </label>
+            <button id="unsubscribe-button" type="button" onclick="performUnsubscribe()" class="btn btn-brand btn-sm focus-ring">
+                Unsubscribe & Archive
+            </button>
+        </div>
     </div>
 </div>
 {% endblock %}
@@ -331,6 +420,14 @@
     document.addEventListener('DOMContentLoaded', function() {
         loadSelectionFromStorage(); // Check boxes based on storage
         updateActionBar(); // Initial action bar update based on storage
+        
+        // Add visible class to fixed action bar after a short delay
+        setTimeout(() => {
+            const actionBar = document.getElementById('fixed-action-bar');
+            if (actionBar) {
+                actionBar.classList.add('visible');
+            }
+        }, 600);
     });
 
     // Check checkboxes on the current page based on stored IDs
@@ -367,6 +464,11 @@
     }
 
     function toggleSenderSelection(senderId) {
+        // Handle the case where senderId might be a string or JSON object
+        if (typeof senderId === 'object') {
+            senderId = JSON.stringify(senderId).replace(/^"|"$/g, '');
+        }
+        
         const senderCheckbox = document.getElementById(`select-sender-${senderId}`);
         if (senderCheckbox) {
             // Programmatically toggle the checkbox state
@@ -396,50 +498,110 @@
     }
 
     function toggleEmailSelection(emailId) {
-         const emailCheckbox = document.querySelector(`.email-checkbox[value="${emailId}"]`);
-         if (emailCheckbox) {
+        // Handle the case where emailId might be a string or JSON object
+        if (typeof emailId === 'object') {
+            emailId = JSON.stringify(emailId).replace(/^"|"$/g, '');
+        }
+        
+        const emailCheckbox = document.querySelector(`.email-checkbox[value="${emailId}"]`);
+        if (emailCheckbox) {
             emailCheckbox.checked = !emailCheckbox.checked;
             handleEmailCheckboxClick(emailCheckbox);
-         } 
-    }
-
-    function handleEmailCheckboxClick(emailCheckbox) {
-        const emailRow = document.getElementById(`email-${emailCheckbox.value}`);
-        if (emailRow) {
-             emailRow.classList.toggle('email-selected', emailCheckbox.checked);
         }
-        // Update storage for this item
-        updateStorageForItem(emailCheckbox.value, emailCheckbox.checked);
-        
-        // Update parent sender checkbox state
-        updateSenderCheckboxState(emailCheckbox.dataset.sender);
-
-        updateActionBar(); // Update count based on storage
     }
 
-    // Helper to update a single sender checkbox based on its children
-    function updateSenderCheckboxState(sender) {
-        const senderId = sender.replace(' ', '-').replace('<', '').replace('>', '').replace('@', '-').replace('.', '-');
+    function handleEmailCheckboxClick(checkbox) {
+        const emailId = checkbox.value;
+        const emailRow = document.getElementById(`email-${emailId}`);
+        
+        if (emailRow) {
+            emailRow.classList.toggle('email-selected', checkbox.checked);
+        }
+        
+        // Update storage
+        updateStorageForItem(emailId, checkbox.checked);
+        
+        // Update the parent sender checkbox state
+        updateSenderCheckboxState(checkbox);
+        
+        // Update action bar with count
+        updateActionBar();
+    }
+
+    function updateSenderCheckboxState(emailCheckbox) {
+        // Find the sender this email belongs to
+        const sender = emailCheckbox.getAttribute('data-sender');
+        if (!sender) return;
+        
+        // Convert to the same format as the ID
+        const senderId = sender.replace(/\s+/g, '-')
+                             .replace(/[<>]/g, '')
+                             .replace(/@/g, '-')
+                             .replace(/\./g, '-');
+        
         const senderCheckbox = document.getElementById(`select-sender-${senderId}`);
-        const senderGroup = document.getElementById(`sender-group-${senderId}`);
-        if (!senderCheckbox || !senderGroup) return; // Sender group might not be on this page
+        if (!senderCheckbox) return;
         
-        const allEmailsForSender = senderGroup.querySelectorAll(`.email-checkbox[data-sender="${sender}"]`);
-        if (allEmailsForSender.length === 0) return; // No emails for this sender on the page
+        // Find all email checkboxes for this sender
+        const emailsDiv = document.getElementById(`emails-${senderId}`);
+        const allEmailCheckboxes = emailsDiv.querySelectorAll('.email-checkbox');
+        const checkedEmailCheckboxes = emailsDiv.querySelectorAll('.email-checkbox:checked');
         
-        const allChecked = Array.from(allEmailsForSender).every(cb => cb.checked);
-        const someChecked = Array.from(allEmailsForSender).some(cb => cb.checked);
-        
-        senderCheckbox.checked = allChecked;
-        senderCheckbox.indeterminate = someChecked && !allChecked;
-        senderGroup.classList.toggle('sender-selected', someChecked);
+        // Update the sender checkbox state based on email selections
+        if (checkedEmailCheckboxes.length === 0) {
+            // None checked
+            senderCheckbox.checked = false;
+            senderCheckbox.indeterminate = false;
+            document.getElementById(`sender-group-${senderId}`).classList.remove('sender-selected');
+        } else if (checkedEmailCheckboxes.length === allEmailCheckboxes.length) {
+            // All checked
+            senderCheckbox.checked = true;
+            senderCheckbox.indeterminate = false;
+            document.getElementById(`sender-group-${senderId}`).classList.add('sender-selected');
+        } else {
+            // Some checked
+            senderCheckbox.checked = false;
+            senderCheckbox.indeterminate = true;
+            document.getElementById(`sender-group-${senderId}`).classList.add('sender-selected');
+        }
     }
-    
-    // Helper to update all sender checkboxes on the page (e.g., after load)
+
     function updateAllSenderCheckboxes() {
+        // Get all sender checkboxes
         const senderCheckboxes = document.querySelectorAll('.sender-checkbox');
-        senderCheckboxes.forEach(cb => {
-            updateSenderCheckboxState(cb.dataset.sender);
+        
+        // For each sender, determine the state based on its email checkboxes
+        senderCheckboxes.forEach(senderCheckbox => {
+            const sender = senderCheckbox.getAttribute('data-sender');
+            if (!sender) return;
+            
+            // Find all email checkboxes for this sender
+            const emailCheckboxes = document.querySelectorAll(`.email-checkbox[data-sender="${sender}"]`);
+            const checkedEmailCheckboxes = Array.from(emailCheckboxes).filter(cb => cb.checked);
+            
+            // Update the sender checkbox state
+            const senderId = sender.replace(/\s+/g, '-')
+                                  .replace(/[<>]/g, '')
+                                  .replace(/@/g, '-')
+                                  .replace(/\./g, '-');
+            const senderGroup = document.getElementById(`sender-group-${senderId}`);
+                                  
+            if (checkedEmailCheckboxes.length === 0) {
+                // None checked
+                senderCheckbox.checked = false;
+                senderCheckbox.indeterminate = false;
+                if (senderGroup) senderGroup.classList.remove('sender-selected');
+            } else if (checkedEmailCheckboxes.length === emailCheckboxes.length) {
+                // All checked
+                senderCheckbox.checked = true;
+                senderCheckbox.indeterminate = false;
+                if (senderGroup) senderGroup.classList.add('sender-selected');
+            } else {
+                // Some checked
+                senderCheckbox.checked = false;
+                senderCheckbox.indeterminate = true;
+                if (senderGroup) senderGroup.classList.add('sender-selected');
+            }
         });
     }
 
@@ -448,44 +610,43 @@
     }
 
     function updateActionBar() {
-        const selectedIdsFromStorage = getSelectedEmailsFromStorage(); // Get total count from storage
-        const count = selectedIdsFromStorage.length;
-        const actionBar = document.getElementById('fixed-action-bar');
+        const selectedEmailIds = getSelectedEmailsFromStorage();
+        const count = selectedEmailIds.length;
         
+        // Get action bar elements
+        const actionBar = document.getElementById('fixed-action-bar');
+        const actionText = document.getElementById('action-count');
+        
+        if (!actionBar || !actionText) return;
+        
+        // Update the count text
+        actionText.textContent = count === 1 ? '1 email selected' : `${count} emails selected`;
+        
+        // Toggle visibility based on selection
         if (count > 0) {
-            actionBar.innerHTML = `
-                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center">
-                    <div class="flex items-center space-x-3">
-                        <span class="text-sm font-medium text-foreground">${count} email${count > 1 ? 's' : ''} selected</span>
-                        <button type="button" onclick="resetSelection()" class="btn btn-ghost btn-sm text-muted-foreground hover:text-foreground hover:bg-muted focus-ring p-1">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-1"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
-                            Reset
-                        </button>
-                    </div>
-                    <div class="flex items-center space-x-3">
-                        <label for="archive-toggle" class="flex items-center text-sm text-muted-foreground">
-                            <input type="checkbox" id="archive-toggle" name="archive" checked class="form-checkbox h-4 w-4 text-brand border-border rounded focus:ring-brand mr-2">
-                            Also archive selected?
-                        </label>
-                        <button id="unsubscribe-button" type="button" onclick="performUnsubscribe()" class="btn btn-brand btn-sm focus-ring">
-                            Unsubscribe & Archive
-                        </button>
-                    </div>
-                </div>
-            `;
             actionBar.classList.remove('hidden');
-            
-            // Update button text based on archive toggle
-            const archiveToggle = document.getElementById('archive-toggle');
-            const unsubscribeButton = document.getElementById('unsubscribe-button');
-            archiveToggle.addEventListener('change', () => {
-                 unsubscribeButton.textContent = archiveToggle.checked ? 'Unsubscribe & Archive' : 'Unsubscribe Only';
-            });
-            unsubscribeButton.textContent = archiveToggle.checked ? 'Unsubscribe & Archive' : 'Unsubscribe Only'; // Initial text
-
         } else {
             actionBar.classList.add('hidden');
-            actionBar.innerHTML = ''; // Clear content
+        }
+    }
+
+    function setLoading(buttonId, loadingText = 'Loading...') {
+        const button = document.getElementById(buttonId);
+        if (button) {
+            button.disabled = true;
+            button.classList.add('opacity-50');
+            button.textContent = loadingText || 'Loading...';
+        }
+    }
+
+    function hideLoading(buttonId, originalText = null) {
+        const button = document.getElementById(buttonId);
+        if (button) {
+            button.disabled = false;
+            button.classList.remove('opacity-50');
+            if (originalText) {
+                button.textContent = originalText;
+            }
         }
     }
 
