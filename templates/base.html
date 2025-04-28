@@ -419,8 +419,8 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center h-16">
                 <div class="flex items-center">
-                    <span class="text-2xl">✨</span>
-                    <span class="ml-3 font-semibold text-xl">Gmail Unsubscriber</span>
+                    <span class="font-semibold text-xl text-brand">Unsubscriber</span>
+                    <span class="ml-2 text-sm text-muted-foreground">by theboring.app</span>
                 </div>
                 <div class="flex items-center space-x-3">
                     <button id="theme-toggle" class="theme-toggle focus-ring">
@@ -485,12 +485,8 @@
         {% block content %}{% endblock %}
     </main>
 
-    <!-- Footer -->
-    <footer class="mt-auto bg-card border-t border-border">
-        <div class="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 text-center text-sm text-muted-foreground">
-            Simple Unsubscriber MVP
-        </div>
-    </footer>
+    <!-- Footer will be included in specific pages -->
+    {% block footer %}{% endblock %}
 
     <!-- Global JS -->
     <script>
