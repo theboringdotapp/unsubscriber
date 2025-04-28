@@ -219,12 +219,6 @@
             </div>
         </div>
 
-        <!-- Add this for debugging -->
-        <p>DEBUG: Type of emails: {{ emails.__class__.__name__ }}</p>
-        <p>DEBUG: Emails content: {{ emails | tojson }}</p>
-        <p>DEBUG: Is emails truthy? {{ True if emails else False }}</p>
-        <!-- End Debugging -->
-
         {% if emails %}
             <form class="action-form" id="unsubscribe-form" action="{{ url_for('unsubscribe_and_archive') }}" method="post" onsubmit="handleUnsubscribeSubmit(event)">
                 <input type="hidden" name="final_email_ids" id="final-email-ids">

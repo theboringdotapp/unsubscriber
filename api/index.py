@@ -17,7 +17,15 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 template_dir = os.path.join(project_root, 'templates')
 
 app = Flask(__name__, template_folder=template_dir)
-app.secret_key = os.urandom(24)  # Needed for Flask session management
+
+# Set a persistent secret key from an environment variable for session management
+SECRET_KEY = os.environ.get('FLASK_SECRET_KEY')
+if not SECRET_KEY:
+    # Provide a warning and an insecure default for local testing if the env var isn't set.
+    # The environment variable MUST be set for production/preview deployments on Vercel.
+    print("WARNING: FLASK_SECRET_KEY environment variable not set. Using insecure default for local dev ONLY.")
+    SECRET_KEY = 'dev-secret-key-replace-this-in-production' # Insecure default
+app.secret_key = SECRET_KEY
 
 # Google API Scopes
 SCOPES = ['https://www.googleapis.com/auth/gmail.modify'] # Read, modify (for archiving), send
@@ -26,17 +34,20 @@ SCOPES = ['https://www.googleapis.com/auth/gmail.modify'] # Read, modify (for ar
 # Prioritize the production URL for OAuth consistency, fall back to deployment URL, then localhost
 PROD_URL = os.environ.get('VERCEL_PROJECT_PRODUCTION_URL')
 DEPLOY_URL = os.environ.get('VERCEL_URL')
+VERCEL_ENV = os.environ.get('VERCEL_ENV', 'development') # Get Vercel environment type
 
-if PROD_URL:
-    BASE_URL = f"https://{PROD_URL}" # Production URL likely doesn't include https:// prefix
-    print(f"--- Using Production URL: {BASE_URL} ---")
+if PROD_URL and VERCEL_ENV == 'production':
+    # Use HTTPS for the production domain
+    BASE_URL = f"https://{PROD_URL}"
+    print(f"--- Using Production URL (HTTPS): {BASE_URL} ---")
 elif DEPLOY_URL:
-    # Ensure BASE_URL starts with https:// if it's a Vercel URL
-    BASE_URL = f"https://{DEPLOY_URL}"
-    print(f"--- Using Deployment URL: {BASE_URL} ---")
+    # Use HTTP for vercel dev (localhost) or preview deployments
+    BASE_URL = f"http://{DEPLOY_URL}" 
+    print(f"--- Using Deployment URL (HTTP): {BASE_URL} ---")
 else:
+    # Fallback for truly local execution (e.g. `python api/index.py`)
     BASE_URL = 'http://127.0.0.1:5001' # Default for local development
-    print(f"--- Using Localhost URL: {BASE_URL} ---")
+    print(f"--- Using Localhost Fallback URL (HTTP): {BASE_URL} ---")
 
 REDIRECT_URI = f'{BASE_URL}/oauth2callback'
 print(f"--- Final REDIRECT_URI: {REDIRECT_URI} ---") # Debugging
