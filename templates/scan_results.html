@@ -803,9 +803,14 @@
              });
          });
 
+        // Clear the set after initiating removals
         processedEmailIds.clear();
-        updateFixedFooter();
+
+        // Clear selection storage BEFORE updating the footer
         saveSelectedEmails({}); 
+
+        // Update the action bar (should hide it as count is now 0)
+        updateFixedFooter();
     }
 
      // Function to close error message (called by 'Close' button in error modal)
