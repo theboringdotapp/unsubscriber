@@ -23,13 +23,23 @@ app.secret_key = os.urandom(24)  # Needed for Flask session management
 SCOPES = ['https://www.googleapis.com/auth/gmail.modify'] # Read, modify (for archiving), send
 
 # --- Vercel Specific Configuration ---
-# Use VERCEL_URL if available (for deployed environment), otherwise default to localhost for development
-BASE_URL = os.environ.get('VERCEL_URL', 'http://127.0.0.1:5001')
-# Ensure BASE_URL starts with https:// if it's a Vercel URL, required by Google OAuth usually
-if 'vercel.app' in BASE_URL and not BASE_URL.startswith('https://'):
-    BASE_URL = f"https://{BASE_URL}"
+# Prioritize the production URL for OAuth consistency, fall back to deployment URL, then localhost
+PROD_URL = os.environ.get('VERCEL_PROJECT_PRODUCTION_URL')
+DEPLOY_URL = os.environ.get('VERCEL_URL')
+
+if PROD_URL:
+    BASE_URL = f"https://{PROD_URL}" # Production URL likely doesn't include https:// prefix
+    print(f"--- Using Production URL: {BASE_URL} ---")
+elif DEPLOY_URL:
+    # Ensure BASE_URL starts with https:// if it's a Vercel URL
+    BASE_URL = f"https://{DEPLOY_URL}"
+    print(f"--- Using Deployment URL: {BASE_URL} ---")
+else:
+    BASE_URL = 'http://127.0.0.1:5001' # Default for local development
+    print(f"--- Using Localhost URL: {BASE_URL} ---")
+
 REDIRECT_URI = f'{BASE_URL}/oauth2callback'
-print(f"--- Using REDIRECT_URI: {REDIRECT_URI} ---") # Debugging
+print(f"--- Final REDIRECT_URI: {REDIRECT_URI} ---") # Debugging
 # --- End Vercel Specific Configuration ---
 
 
