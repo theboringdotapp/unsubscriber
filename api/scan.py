@@ -3,8 +3,9 @@ import base64
 import email
 from urllib.parse import urlparse, parse_qs
 from email.mime.text import MIMEText
-from flask import Blueprint, redirect, url_for, request, session, flash, render_template
+from flask import Blueprint, redirect, url_for, request, session, flash, render_template, jsonify
 from googleapiclient.discovery import build # Needed?
+from datetime import datetime # Add datetime import
 
 # Import utils and constants
 from . import utils
@@ -145,6 +146,22 @@ def render_unsubscribe_modal_content(success=True, message="", http_link=None):
         """
     return html
 
+def format_email_date(internal_date_ms):
+    """Converts Gmail internal date (milliseconds since epoch) to a readable string."""
+    try:
+        # Convert milliseconds to seconds
+        timestamp_sec = int(internal_date_ms) / 1000
+        dt_object = datetime.fromtimestamp(timestamp_sec)
+        # Format as something like "Apr 28" or "2023 Dec 25"
+        now = datetime.now()
+        if dt_object.year == now.year:
+            return dt_object.strftime("%b %d") # e.g., Apr 28
+        else:
+            return dt_object.strftime("%Y %b %d") # e.g., 2023 Dec 25
+    except Exception as e:
+        print(f"Error formatting date {internal_date_ms}: {e}")
+        return "Unknown Date"
+
 # --- Routes --- 
 
 @scan_bp.route('/scan', methods=['GET'])
@@ -163,6 +180,17 @@ def scan_emails():
     authenticated = True 
     found_subscriptions = {} 
     next_page_token = None 
+    
+    # Define colors here in Python
+    colors = [
+        '217 91% 60%', # Blue
+        '158 78% 42%', # Green
+        '350 89% 60%', # Pink
+        '39 95% 55%',  # Orange
+        '262 78% 60%', # Purple
+        '197 88% 55%', # Cyan
+        '22 90% 58%'   # Reddish-Orange
+    ]
 
     try:
         print("Fetching email page.")
@@ -184,25 +212,70 @@ def scan_emails():
         else:
             for message_stub in messages:
                 msg_id = message_stub['id']
-                if MOCK_API:
-                    full_message = _get_mock_message_details(msg_id)
-                else:
-                    full_message = service.users().messages().get(
-                        userId='me', id=msg_id, format='metadata',
-                        metadataHeaders=['List-Unsubscribe', 'From', 'Subject']
-                    ).execute()
-                unsubscribe_link, link_type = find_unsubscribe_links(full_message)
-                if unsubscribe_link:
-                    headers = full_message.get('payload', {}).get('headers', [])
-                    sender = next((h['value'] for h in headers if h['name'].lower() == 'from'), 'Unknown Sender')
-                    subject = next((h['value'] for h in headers if h['name'].lower() == 'subject'), 'No Subject')
-                    if '<' in sender and '>' in sender:
-                        clean_sender = sender[:sender.find('<')].strip().replace('"', '') or sender[sender.find('<')+1:sender.find('>')]
-                    else: clean_sender = sender
-                    email_data = {"link": unsubscribe_link, "type": link_type, "full_sender": sender, "subject": subject, "message_id": msg_id}
-                    if clean_sender not in found_subscriptions: found_subscriptions[clean_sender] = [email_data]
-                    else: found_subscriptions[clean_sender].append(email_data)
-        
+                try: # Add try/except around individual message processing
+                    if MOCK_API:
+                        full_message = _get_mock_message_details(msg_id)
+                        # Add mock date if needed for testing
+                        full_message['internalDate'] = str(int(datetime.now().timestamp() * 1000))
+                    else:
+                        full_message = service.users().messages().get(
+                            userId='me', id=msg_id, format='metadata',
+                            # Request InternalDate along with other headers
+                            metadataHeaders=['List-Unsubscribe', 'From', 'Subject'] 
+                        ).execute()
+                    
+                    unsubscribe_link, link_type = find_unsubscribe_links(full_message)
+                    
+                    if unsubscribe_link:
+                        headers = full_message.get('payload', {}).get('headers', [])
+                        sender = next((h['value'] for h in headers if h['name'].lower() == 'from'), 'Unknown Sender')
+                        subject = next((h['value'] for h in headers if h['name'].lower() == 'subject'), 'No Subject')
+                        
+                        # Extract and format date
+                        internal_date = full_message.get('internalDate', '0')
+                        email_date_formatted = format_email_date(internal_date)
+                        
+                        # Determine clean sender name (used as the primary key)
+                        if '<' in sender and '>' in sender:
+                            clean_sender = sender[:sender.find('<')].strip().replace('"', '')
+                            # If name part is empty, use the email part as fallback
+                            if not clean_sender:
+                                start = sender.find('<') + 1
+                                end = sender.find('>')
+                                if start < end:
+                                     clean_sender = sender[start:end]
+                                else:
+                                     clean_sender = sender # Fallback to raw if parsing fails badly
+                        else: 
+                            clean_sender = sender
+                        
+                        # Structure the email data
+                        email_data = {
+                            "id": msg_id,
+                            "subject": subject,
+                            "date": email_date_formatted,
+                            # We might not need link/type/full_sender per email anymore if handling unsubscribe per sender
+                            # Keep them for now if needed elsewhere, but check later
+                            "link": unsubscribe_link, 
+                            "type": link_type, 
+                            "full_sender": sender
+                        }
+                        
+                        # Add to the dictionary using the new structure
+                        if clean_sender not in found_subscriptions:
+                            found_subscriptions[clean_sender] = {
+                                'emails': [email_data],
+                                # Store the first found unsubscribe link as the primary for the sender group
+                                'unsubscribe_link': unsubscribe_link 
+                            }
+                        else:
+                            found_subscriptions[clean_sender]['emails'].append(email_data)
+                            # Optionally update the primary link if a new one is found (e.g., prefer https)
+                            # For simplicity, we keep the first one found for this sender.
+                except Exception as msg_error:
+                     print(f"!!! ERROR processing message {msg_id}: {msg_error} !!!")
+                     # Optionally skip this email or handle error appropriately
+
         next_page_token = list_response.get('nextPageToken')
         print(f"--- SCAN ROUTE: Next page token from API: {next_page_token} ---")
         print(f"Scan finished for this page. Found {len(found_subscriptions)} unique senders on this page.")
@@ -210,105 +283,202 @@ def scan_emails():
     except Exception as e:
         flash(f"An error occurred during email scan: {e}", "error")
         print(f"!!! ERROR during scan loop: {e} !!!")
-        return render_template('scan_results.html', emails=found_subscriptions, error=str(e), authenticated=authenticated, current_page_token=page_token, next_page_token=next_page_token)
+        # Pass colors here too
+        return render_template('scan_results.html', subscriptions=found_subscriptions, error=str(e), authenticated=authenticated, current_page_token=page_token, next_page_token=next_page_token, colors=colors)
 
     if not found_subscriptions and not page_token:
         flash("No emails with unsubscribe links found in the initial scan.", "info")
 
-    return render_template('scan_results.html', emails=found_subscriptions, authenticated=authenticated, current_page_token=page_token, next_page_token=next_page_token)
+    # Pass colors to the template context
+    return render_template('scan_results.html', subscriptions=found_subscriptions, authenticated=authenticated, current_page_token=page_token, next_page_token=next_page_token, colors=colors)
 
 @scan_bp.route('/unsubscribe', methods=['POST'])
 def unsubscribe_and_archive():
-    """Handles the unsubscribe action from the form (visiting link/sending email)."""
+    """Handles the unsubscribe action from the form (visiting link/sending email). Now returns JSON."""
     service = utils.get_gmail_service()
     if not service:
-        if request.headers.get('HX-Request') == 'true':
-            return render_unsubscribe_modal_content(success=False, message="Authentication required. Please refresh and log in again."), 401
-        else:
-            flash("Authentication required.", "warning")
-            return redirect(url_for('auth.login')) # Redirect to auth blueprint
+        return jsonify({"success": False, "error": "Authentication required. Please refresh and log in again."}), 401
 
-    is_ajax = request.headers.get('HX-Request') == 'true'
-    # ... (rest of implementation as before, using utils.get_gmail_service) ...
-    final_ids_str = request.form.get('final_email_ids')
-    final_links_str = request.form.get('final_unsubscribe_links')
-    should_archive = request.form.get('should_archive') == 'true'
-    if not final_ids_str or not final_links_str:
-         if is_ajax: return render_unsubscribe_modal_content(success=False, message="Missing email IDs or links."), 400
-         else: flash("Missing info.", "error"); return redirect(url_for('.scan_emails')) # Relative BP redirect
-    ids = final_ids_str.split(',')
-    links_raw = final_links_str.split(',,,,,')
-    message_id = ids[0] if ids else None # Still processing first only
-    link_type, link, sender = None, None, "Selected Email"
-    if message_id:
-         try:
-            full_message = service.users().messages().get(userId='me', id=message_id, format='metadata', metadataHeaders=['List-Unsubscribe', 'From']).execute()
-            link, link_type = find_unsubscribe_links(full_message)
-            # ... (get sender name) ...
+    # Get data from form POST
+    email_ids = request.form.getlist('email_ids')
+    should_archive = request.form.get('archive') == 'true'
+    
+    if not email_ids:
+        return jsonify({"success": False, "error": "Missing email IDs."}), 400
+        
+    print(f"--- UNSUBSCRIBE ACTION for IDs: {email_ids}, Archive: {should_archive} ---")
+    
+    # We only need to process ONE unsubscribe action per SENDER.
+    # Fetch details for the first email ID of each sender represented in the list.
+    processed_senders = set()
+    unsubscribe_actions = [] # List of tuples: (email_id, link_type, link, sender)
+    emails_to_archive = set(email_ids) if should_archive else set()
+    
+    # Batch fetch minimal details for all selected emails to group by sender efficiently
+    sender_map = {}
+    for msg_id in email_ids:
+        try:
+            # Fetch only From header initially
+            full_message = service.users().messages().get(userId='me', id=msg_id, format='metadata', metadataHeaders=['From']).execute()
             headers = full_message.get('payload', {}).get('headers', [])
-            sender_raw = next((h['value'] for h in headers if h['name'].lower() == 'from'), sender)
-            if '<' in sender_raw and '>' in sender_raw: sender = sender_raw[:sender_raw.find('<')].strip().replace('"', '') or sender_raw
-            else: sender = sender_raw
-         except Exception as fetch_err:
-             print(f"Error fetching msg {message_id}: {fetch_err}")
-             if is_ajax: return render_unsubscribe_modal_content(success=False, message=f"Could not retrieve details for message."), 500
-             else: flash(f"Could not retrieve details.", "error"); return redirect(url_for('.scan_emails'))
-    if not link or not link_type or not message_id:
-         if is_ajax: return render_unsubscribe_modal_content(success=False, message="Missing link/type/ID after re-fetch."), 400
-         else: flash("Missing info after re-fetch.", "error"); return redirect(url_for('.scan_emails'))
-    print(f"--- UNSUBSCRIBE ACTION (ID: {message_id}) ...")
-    success, error_message, http_link_for_modal = False, None, None
-    try:
-        if link_type == 'header_http':
-            http_link_for_modal = link
-            if should_archive: service.users().messages().modify(userId='me', id=message_id, body={'removeLabelIds': ['INBOX']}).execute()
-            success = True
-        elif link_type == 'header_mailto':
-            parsed_mailto = urlparse(link); to_address = parsed_mailto.path; params = parse_qs(parsed_mailto.query)
-            subject = params.get('subject', ['Unsubscribe'])[0]; body = params.get('body', ['Please unsubscribe me.'])[0]
-            if not to_address: raise ValueError("Mailto link missing recipient.")
-            message = MIMEText(body); message['to'] = to_address; message['subject'] = subject
-            raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
-            send_message_body = {'raw': raw_message}
-            if MOCK_API:
-                print("--- MOCK SEND EMAIL ---")
+            sender_raw = next((h['value'] for h in headers if h['name'].lower() == 'from'), None)
+            if sender_raw:
+                 # Extract email address for more reliable grouping
+                sender_email = None
+                if '<' in sender_raw and '>' in sender_raw:
+                    start = sender_raw.find('<') + 1
+                    end = sender_raw.find('>')
+                    if start < end: sender_email = sender_raw[start:end]
+                
+                # Fallback if email isn't in <>
+                if not sender_email:
+                    # Basic check if it looks like an email address
+                    if '@' in sender_raw:
+                         sender_email = sender_raw.strip()
+                
+                # Use raw sender if email extraction fails
+                grouping_key = sender_email if sender_email else sender_raw
+                
+                if grouping_key not in sender_map:
+                    sender_map[grouping_key] = {"name": sender_raw, "first_email_id": msg_id}
+        except Exception as e:
+            print(f"Warning: Failed to fetch initial details for {msg_id}: {e}")
+            # Can't group this one, might cause issues later if it was the only one for a sender
+
+    # Now, for each unique sender, fetch full details for the *first* email to get the link
+    for sender_key, sender_data in sender_map.items():
+        if sender_key in processed_senders:
+            continue
+        
+        first_email_id = sender_data["first_email_id"]
+        sender_name = sender_data["name"]
+        try:
+            full_message = service.users().messages().get(userId='me', id=first_email_id, format='metadata', metadataHeaders=['List-Unsubscribe', 'From']).execute()
+            link, link_type = find_unsubscribe_links(full_message)
+            if link and link_type:
+                # Clean up sender name for display
+                if '<' in sender_name and '>' in sender_name:
+                    display_sender = sender_name[:sender_name.find('<')].strip().replace('"', '') or sender_name
+                else: display_sender = sender_name
+                unsubscribe_actions.append((first_email_id, link_type, link, display_sender))
+                processed_senders.add(sender_key)
             else:
-                service.users().messages().send(userId='me', body=send_message_body).execute()
-            if should_archive: service.users().messages().modify(userId='me', id=message_id, body={'removeLabelIds': ['INBOX']}).execute()
-            success = True
-    except Exception as e: error_message = f"Error processing unsubscribe for {sender}: {e}"; print(f"!!! ERROR: {error_message} !!!")
-    if is_ajax:
-        if success:
-            archive_msg = " Email archived." if should_archive else " Email kept."
-            modal_msg = f"Unsubscribe sent for {sender}.{archive_msg}" if link_type == 'header_mailto' else f"Processed archive for {sender}.{archive_msg}"
-            return render_unsubscribe_modal_content(success=True, message=modal_msg, http_link=http_link_for_modal)
-        else: return render_unsubscribe_modal_content(success=False, message=error_message or "Unknown error.")
-    else:
-        if success:
-             if link_type == 'header_http': session['unsubscribe_success'] = f"Redirecting... Email { 'archived' if should_archive else 'kept'}."; return redirect(link)
-             else: flash(f"Email sent for {sender}! Email { 'archived' if should_archive else 'kept'}.", "success")
-        else: flash(error_message, "error") # Flash error only if non-AJAX
-        return redirect(url_for('index')) 
+                print(f"No unsubscribe link found for sender {sender_key} (using email {first_email_id})")
+        except Exception as fetch_err:
+            print(f"Error fetching full details for {first_email_id} (Sender: {sender_key}): {fetch_err}")
+
+    # --- Perform Unsubscribe Actions ---
+    success_count = 0
+    fail_count = 0
+    errors = []
+    http_link_for_modal = None # Store the last HTTP link for potential manual visit
+
+    for msg_id, link_type, link, sender in unsubscribe_actions:
+        try:
+            print(f"Processing unsubscribe for {sender} via {link_type}")
+            if link_type == 'header_http':
+                # We don't actually visit the link client-side did this
+                # Store it in case user needs it
+                http_link_for_modal = link 
+                print(f"  - (HTTP link for {sender}: {link})")
+                # Mark as success (assuming client-side fetch worked)
+                success_count += 1
+            elif link_type == 'header_mailto':
+                # Parse and send mailto
+                parsed_mailto = urlparse(link)
+                to_address = parsed_mailto.path
+                params = parse_qs(parsed_mailto.query)
+                subject = params.get('subject', ['Unsubscribe'])[0]
+                body = params.get('body', ['Please unsubscribe me.'])[0]
+                
+                if not to_address: raise ValueError("Mailto link missing recipient.")
+                
+                message = MIMEText(body)
+                message['to'] = to_address
+                message['subject'] = subject
+                raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
+                send_message_body = {'raw': raw_message}
+                
+                if MOCK_API:
+                    print(f"  - MOCK SEND EMAIL to {to_address} for {sender}")
+                else:
+                    service.users().messages().send(userId='me', body=send_message_body).execute()
+                    print(f"  - Sent mailto for {sender}")
+                success_count += 1
+        except Exception as e:
+            fail_count += 1
+            error_detail = f"Failed to process unsubscribe for {sender}: {e}"
+            print(f"!!! ERROR: {error_detail} !!!")
+            errors.append(error_detail)
+
+    # --- Archive Emails (if requested) ---
+    archive_success_count = 0
+    archive_fail_count = 0
+    archive_errors = []
+    if should_archive and emails_to_archive:
+        print(f"Archiving {len(emails_to_archive)} emails...")
+        for msg_id in emails_to_archive:
+            try:
+                service.users().messages().modify(userId='me', id=msg_id, body={'removeLabelIds': ['INBOX']}).execute()
+                archive_success_count += 1
+            except Exception as e:
+                archive_fail_count += 1
+                error_detail = f"Failed to archive {msg_id}: {e}"
+                print(f"!!! ERROR: {error_detail} !!!")
+                archive_errors.append(error_detail)
+        print(f"Archiving finished. Success: {archive_success_count}, Fail: {archive_fail_count}")
+
+    # --- Construct Response --- 
+    overall_success = fail_count == 0 and archive_fail_count == 0
+    message_parts = []
+    if success_count > 0:
+        message_parts.append(f"Processed {success_count} unsubscribe action{ 's' if success_count != 1 else '' }.")
+    if fail_count > 0:
+         message_parts.append(f"{fail_count} unsubscribe action{ 's' if fail_count != 1 else '' } failed.")
+    if should_archive:
+         if archive_success_count > 0:
+             message_parts.append(f"Archived {archive_success_count} email{ 's' if archive_success_count != 1 else '' }.")
+         if archive_fail_count > 0:
+            message_parts.append(f"{archive_fail_count} email{ 's' if archive_fail_count != 1 else '' } failed to archive.")
+    elif not should_archive and emails_to_archive: # Explicitly state if archive was off
+         message_parts.append("Archiving was disabled.")
+
+    final_message = " ".join(message_parts) if message_parts else "No actions performed."
+
+    response_data = {
+        "success": overall_success,
+        "message": final_message,
+        "details": {
+            "unsubscribe_errors": errors,
+            "archive_errors": archive_errors
+        },
+        # Provide the last HTTP link in case manual action is needed
+        "http_link": http_link_for_modal if fail_count > 0 else None 
+    }
+
+    status_code = 200 if overall_success else 500 # Use 500 if any part failed
+    return jsonify(response_data), status_code
 
 # --- New Route for Archiving --- 
 @scan_bp.route('/archive', methods=['POST'])
 def archive_emails():
-    """Archives a list of emails provided by message IDs."""
+    """Archives a list of emails provided by message IDs. Returns JSON."""
     print("--- ARCHIVE ROUTE START ---")
     service = utils.get_gmail_service()
     if not service:
          # Return JSON error for AJAX
-        return {"success": False, "error": "Authentication required."}, 401
+        return jsonify({"success": False, "error": "Authentication required."}), 401
 
-    data = request.get_json()
-    if not data or 'message_ids' not in data:
-        print("Archive route: Missing message_ids in JSON payload")
-        return {"success": False, "error": "Missing message_ids"}, 400
+    # Expect form data now, not JSON
+    message_ids = request.form.getlist('email_ids') 
+    if not message_ids:
+        print("Archive route: Missing email_ids in form data")
+        return jsonify({"success": False, "error": "Missing email IDs"}), 400
 
-    message_ids = data['message_ids']
+    # Check if message_ids is actually a list (it should be from getlist)
     if not isinstance(message_ids, list):
-        print("Archive route: message_ids is not a list")
-        return {"success": False, "error": "message_ids must be a list"}, 400
+        print("Archive route: email_ids is not a list (unexpected)")
+        message_ids = [message_ids] # Attempt to recover if it's a single string
         
     print(f"Archive route: Received {len(message_ids)} IDs to archive.")
 
@@ -319,11 +489,14 @@ def archive_emails():
     for msg_id in message_ids:
         try:
             # print(f"Attempting to archive {msg_id}")
-            service.users().messages().modify(
-                userId='me',
-                id=msg_id,
-                body={'removeLabelIds': ['INBOX']} 
-            ).execute()
+            if MOCK_API:
+                print(f"--- MOCK ARCHIVE EMAIL ID: {msg_id} ---")
+            else:
+                service.users().messages().modify(
+                    userId='me',
+                    id=msg_id,
+                    body={'removeLabelIds': ['INBOX']} 
+                ).execute()
             success_count += 1
         except Exception as e:
             fail_count += 1
@@ -332,9 +505,20 @@ def archive_emails():
             errors.append(error_detail)
 
     print(f"Archive route: Finished. Success: {success_count}, Failed: {fail_count}")
+    overall_success = fail_count == 0
+    final_message = f"Successfully archived {success_count} email{ 's' if success_count != 1 else '' }."
     if fail_count > 0:
-         return {"success": False, "error": f"Completed with {fail_count} errors.", "details": errors}, 500
-    else:
-        return {"success": True, "message": f"Successfully archived {success_count} emails."}, 200
+        final_message += f" Failed to archive {fail_count} email{ 's' if fail_count != 1 else '' }."
+    
+    response_data = {
+        "success": overall_success,
+        "message": final_message,
+        "details": {
+            "archive_errors": errors
+        }
+    }
+    status_code = 200 if overall_success else 500
+    
+    return jsonify(response_data), status_code
 
 # --- End New Route --- 

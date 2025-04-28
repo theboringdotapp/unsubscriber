@@ -4,112 +4,55 @@
 
 {% block head_extra %}
 <style>
-    /* Checkmark animation styles */
-    .checkmark-container {
-        width: 80px;
-        height: 80px;
-        position: relative;
-    }
-    
-    .checkmark {
-        width: 80px;
-        height: 80px;
-        border-radius: 50%;
-        display: block;
-        stroke-width: 2;
-        stroke: #1a7f37;
-        stroke-miterlimit: 10;
-        box-shadow: inset 0px 0px 0px #1a7f37;
-        animation: fill .4s ease-in-out .4s forwards, scale .3s ease-in-out .9s both;
-    }
-    
-    .checkmark-circle {
-        stroke-dasharray: 166;
-        stroke-dashoffset: 166;
-        stroke-width: 2;
-        stroke-miterlimit: 10;
-        stroke: #1a7f37;
-        fill: none;
-        animation: stroke 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards;
-    }
-    
-    .checkmark-check {
-        transform-origin: 50% 50%;
-        stroke-dasharray: 48;
-        stroke-dashoffset: 48;
-        animation: stroke 0.3s cubic-bezier(0.65, 0, 0.45, 1) 0.8s forwards;
-    }
-    
-    @keyframes stroke {
-        100% {
-            stroke-dashoffset: 0;
-        }
-    }
-    
-    @keyframes scale {
-        0%, 100% {
-            transform: none;
-        }
-        50% {
-            transform: scale3d(1.1, 1.1, 1);
-        }
-    }
-    
-    @keyframes fill {
-        100% {
-            box-shadow: inset 0px 0px 0px 30px #eaffef;
-        }
-    }
-    
-    /* Modal overlay */
-    .modal-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background-color: rgba(0, 0, 0, 0.5);
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        z-index: 100;
-    }
-    
-    .modal-hidden {
-        display: none;
-    }
+    /* Inherit checkmark styles from base.html */
 
-    /* Sender group styles */
+    /* Modal overlay */
+    /* Inherit modal overlay styles from base.html */
+
+    /* Sender group styles - Keep custom colors logic for now */
     .sender-group {
-        border-left: 3px solid var(--sender-color, var(--accent-color));
+        border-left: 3px solid hsl(var(--sender-color-hsl, var(--brand))); /* Use HSL */
         margin-bottom: 1rem;
+        border-radius: 0 var(--radius) var(--radius) 0; /* Apply border radius */
+        background-color: hsl(var(--card)); /* Use card background */
+        box-shadow: var(--shadow-sm); /* Add subtle shadow */
+        overflow: hidden; /* Needed for border radius */
     }
     
     .sender-header {
         padding: 0.75rem 1rem;
-        background-color: rgba(var(--sender-color-rgb, var(--accent-color-rgb)), 0.1);
+        /* Use rgba with HSL variables for background */
+        background-color: hsla(var(--sender-color-hsl, var(--brand)), 0.1);
         display: flex;
         justify-content: space-between;
         align-items: center;
+        border-bottom: 1px solid hsl(var(--border)); /* Add border */
     }
     
     .sender-name-container {
         cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
     }
     
     .collapse-button {
         cursor: pointer;
-        padding: 4px;
-        border-radius: 4px;
+        padding: 0.25rem;
+        border-radius: var(--radius);
         transition: background-color 0.2s;
+        color: hsl(var(--muted-foreground));
     }
     
     .collapse-button:hover {
-        background-color: rgba(0, 0, 0, 0.05);
+        background-color: hsl(var(--muted));
+        color: hsl(var(--accent-foreground));
     }
     
     .sender-emails {
         overflow: hidden;
+        background-color: hsl(var(--card)); /* Ensure background */
+        padding: 0; /* Remove padding if emails have their own */
     }
     
     .sender-emails.collapsed {
@@ -118,6 +61,8 @@
     
     .sender-name {
         transition: all 0.2s ease;
+        font-weight: 500;
+        color: hsl(var(--foreground)); /* Use foreground color */
     }
     
     .sender-selected .sender-name {
@@ -125,14 +70,36 @@
         opacity: 0.7;
     }
     
-    /* Content container with max-width */
-    .content-container {
-        max-width: 1280px;
-        margin: 0 auto;
-        width: 100%;
+    /* Email row specific styles */
+    .email-row {
+        padding: 0.75rem 1rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid hsl(var(--border));
+        transition: background-color 0.15s ease-in-out;
+    }
+
+    .email-row:last-child {
+        border-bottom: none;
+    }
+
+    .email-row:hover {
+         background-color: hsl(var(--muted));
+    }
+
+    .email-selected {
+        background-color: hsla(var(--brand), 0.1);
+    }
+
+    .email-selected .email-subject {
+         text-decoration: line-through;
+         opacity: 0.7;
     }
     
-    /* Tooltip fixes */
+    /* Content container with max-width - Inherited from base.html main */
+
+    /* Tooltip styles - Simplified */
     .tooltip {
         position: relative;
         display: inline-flex;
@@ -146,8 +113,8 @@
         width: 1.25rem;
         height: 1.25rem;
         border-radius: 50%;
-        background-color: var(--text-secondary);
-        color: white;
+        background-color: hsl(var(--muted-foreground));
+        color: hsl(var(--background)); /* Contrast color */
         font-size: 0.75rem;
         font-weight: bold;
         cursor: help;
@@ -156,14 +123,15 @@
     .tooltip-text {
         visibility: hidden;
         width: 280px;
-        background-color: #333;
-        color: #fff;
-        text-align: center;
-        border-radius: 6px;
-        padding: 10px;
+        background-color: hsl(var(--popover));
+        color: hsl(var(--popover-foreground));
+        border: 1px solid hsl(var(--border));
+        box-shadow: var(--shadow-md);
+        border-radius: var(--radius);
+        padding: 0.75rem;
         position: absolute;
         z-index: 10;
-        bottom: 125%;
+        bottom: 125%; /* Position above */
         left: 50%;
         transform: translateX(-50%);
         opacity: 0;
@@ -171,9 +139,11 @@
         font-size: 0.875rem;
         font-weight: normal;
         text-align: left;
+        pointer-events: none; /* Allow clicking through */
     }
     
-    .tooltip:hover .tooltip-text {
+    .tooltip:hover .tooltip-text,
+    .tooltip:focus-within .tooltip-text { /* Show on focus within for accessibility */
         visibility: visible;
         opacity: 1;
     }
@@ -187,834 +157,509 @@
         margin-left: -5px;
         border-width: 5px;
         border-style: solid;
-        border-color: #333 transparent transparent transparent;
+        border-color: hsl(var(--popover)) transparent transparent transparent;
+    }
+    .dark .tooltip-text::after {
+         border-color: hsl(var(--popover)) transparent transparent transparent;
+    }
+
+    /* Remove the border applied by the tooltip style itself */
+     .tooltip-text { border: none; } /* Remove this border, use shadow */
+
+
+    /* Table styles (if applicable, can be removed if only using divs) */
+    table { width: 100%; border-collapse: collapse; }
+    thead { border-bottom: 1px solid hsl(var(--border)); }
+    th { padding: 0.75rem 1rem; text-align: left; font-weight: 500; color: hsl(var(--muted-foreground)); }
+    td { padding: 0.75rem 1rem; border-bottom: 1px solid hsl(var(--border)); color: hsl(var(--foreground)); }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:hover { background-color: hsl(var(--muted)); }
+
+    /* Clickable Table Row Style */
+    .clickable-row {
+        cursor: pointer;
     }
     
-    /* Ensure tooltip container has overflow visible */
-    .tooltip-container {
-        position: relative;
-        overflow: visible;
+    /* Fixed action bar */
+    #fixed-action-bar {
+        padding: 1rem; /* Adjust padding */
+        /* Background and border inherited from base.html */
     }
+    
+    /* Ensure action bar buttons use new styles */
+    #fixed-action-bar .btn {
+        /* Style specific buttons if needed */
+    }
+
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="content-container">
-    <div class="card-bg rounded-lg overflow-hidden">
-        <div class="px-6 py-4 border-b border-[var(--border-color)]">
-            <h1 class="text-2xl font-semibold">Potential Unsubscribe Emails</h1>
-            <div class="tooltip-container">
-                <p class="text-sm text-[var(--text-secondary)] mt-2">
-                    You only need to unsubscribe from one email per sender to be removed from their mailing list.
-                    <span class="tooltip">
-                        <span class="tooltip-icon">?</span>
-                        <span class="tooltip-text">
-                            <strong>How unsubscribing works:</strong><br>
-                            - You only need to unsubscribe once per sender to stop future emails<br>
-                            - Selecting multiple emails from the same sender will only trigger one unsubscribe request<br>
-                            - Archiving is optional and only affects emails already in your inbox
-                        </span>
-                    </span>
-                </p>
-            </div>
+<div class="content-container pb-24"> <!-- Add padding-bottom to avoid overlap with fixed bar -->
+
+    <div class="mb-8 text-center">
+        <h1 class="text-3xl font-bold text-foreground">Scan Results</h1>
+        <p class="text-muted-foreground mt-2">Found potential subscriptions. Select emails to unsubscribe or archive.</p>
+    </div>
+
+    {% if not subscriptions %}
+        <div class="card p-6 text-center">
+            <p class="text-muted-foreground">No emails with unsubscribe links found in the last {{ config.MAX_SCAN_EMAILS }} scanned messages.</p>
+            <a href="{{ url_for('index') }}" class="btn btn-secondary mt-4 focus-ring">Back Home</a>
         </div>
-
-        {% if emails %}
-            <form class="action-form" id="unsubscribe-form" action="{{ url_for('scan.archive_emails') }}" method="post" onsubmit="handleUnsubscribeSubmit(event)">
-                <input type="hidden" name="final_email_ids" id="final-email-ids">
-                <input type="hidden" name="should_archive" id="should-archive-input">
-
-                <div class="px-6 py-3">
-                    <div id="email-list-body">
-                        {% for sender, sender_emails_list in emails.items() %}
-                            <div class="sender-group" data-sender="{{ sender | escape }}">
-                                <div class="sender-header">
-                                    <div class="flex items-center sender-name-container" onclick="handleSenderNameClick(event, this)">
-                                        <input type="checkbox" onclick="event.stopPropagation(); handleSenderCheckboxClick(this, '{{ sender | escape }}')" class="form-checkbox h-4 w-4 rounded text-[var(--accent-color)] focus:ring-[var(--accent-color)] sender-checkbox mr-3">
-                                        <div>
-                                            <span class="font-medium sender-name">{{ sender }}</span>
-                                            <span class="ml-2 text-xs text-[var(--text-secondary)]">({{ sender_emails_list|length }} email{{ 's' if sender_emails_list|length > 1 else '' }})</span>
-                                        </div>
-                                    </div>
-                                    <div class="collapse-button" onclick="toggleSenderGroup(this)">
-                                        <svg class="h-5 w-5 text-[var(--text-secondary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                                        </svg>
-                                    </div>
-                                </div>
-                                <div class="sender-emails">
-                                    <div class="overflow-x-auto">
-                                        <table class="min-w-full divide-y divide-[var(--border-color)] table-fixed">
-                                            <thead>
-                                                <tr>
-                                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider w-16">
-                                                        Select
-                                                    </th>
-                                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">
-                                                        Subject
-                                                    </th>
-                                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider w-32">
-                                                        Unsubscribe Link
-                                                    </th>
-                                                </tr>
-                                            </thead>
-                                            <tbody class="divide-y divide-[var(--border-color)]">
-                                                {% for email in sender_emails_list %}
-                                                {# Determine if checkbox should be disabled #}
-                                                {% set is_mailto = email.type == 'header_mailto' %}
-                                                <tr data-sender="{{ sender | escape }}" 
-                                                    data-id="{{ email.message_id }}" 
-                                                    data-link="{{ email.link }}" 
-                                                    data-type="{{ email.type }}" {# Store type #}
-                                                    class="hover:bg-[var(--hover-bg)] {{ 'opacity-75' if is_mailto else 'clickable-row' }}" {# Add opacity, remove clickable if mailto #}
-                                                    title="{{ 'Mailto links require manual action' if is_mailto else '' }}">
-                                                    <td class="px-6 py-4 whitespace-nowrap w-16">
-                                                        <input type="checkbox" 
-                                                               name="email_ids_page" 
-                                                               value="{{ email.message_id }}" 
-                                                               onclick="handleSingleCheckboxClick(this)" 
-                                                               class="form-checkbox h-4 w-4 rounded text-[var(--accent-color)] focus:ring-[var(--accent-color)] item-checkbox {{ 'cursor-not-allowed' if is_mailto }}" 
-                                                               {{ 'disabled' if is_mailto }}> {# Disable checkbox #}
-                                                    </td>
-                                                    <td class="px-6 py-4 text-sm text-[var(--text-primary)] truncate" title="{{ email.subject }}">
-                                                        {{ email.subject }}
-                                                    </td>
-                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-secondary)] w-32">
-                                                        {% if is_mailto %}
-                                                            <a href="{{ email.link }}" target="_blank" class="text-orange-600 hover:text-orange-800 hover:underline text-xs email-link" title="{{ email.link }} (Requires Manual Send)">Send Mailto</a>
-                                                        {% else %}
-                                                            {# HTTP Link - Maybe just show link or a generic button? Let's keep Visit Link for now #}
-                                                            <a href="{{ email.link }}" target="_blank" class="text-[var(--accent-color)] hover:text-[var(--accent-hover)] hover:underline text-xs email-link" title="{{ email.link }}">Visit Link</a>
-                                                        {% endif %}
-                                                    </td>
-                                                </tr>
-                                                {% endfor %}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
+    {% else %}
+        <form id="unsubscribe-form">
+            <div id="subscription-list" class="space-y-4">
+                {% for clean_sender, data in subscriptions.items() %}
+                    {% set sender_id = clean_sender|replace(' ', '-')|replace('<', '')|replace('>', '')|replace('@', '-')|replace('.', '-') %}
+                    {% set color_index = loop.index0 % colors|length %}
+                    {% set sender_color_hsl = colors[color_index] %}
+                    <div class="sender-group" 
+                         id="sender-group-{{ sender_id }}" 
+                         data-sender="{{ clean_sender }}"
+                         style="--sender-color-hsl: {{ sender_color_hsl }};">
+                        <div class="sender-header">
+                            <div class="sender-name-container" onclick="toggleSenderSelection('{{ sender_id }}')">
+                                <input type="checkbox" 
+                                       id="select-sender-{{ sender_id }}" 
+                                       class="sender-checkbox form-checkbox h-4 w-4 text-brand border-border rounded focus:ring-brand" 
+                                       data-sender="{{ clean_sender }}"
+                                       onclick="event.stopPropagation(); selectAllSenderEmails(this, '{{ sender_id }}');">
+                                <label for="select-sender-{{ sender_id }}" class="sender-name ml-2">{{ clean_sender }} ({{ data.emails|length }})</label>
+                                {% if data.unsubscribe_link %}
+                                <span class="tooltip-container">
+                                    <a href="{{ data.unsubscribe_link }}" 
+                                       target="_blank" 
+                                       class="ml-2 text-xs text-brand hover:underline" 
+                                       onclick="event.stopPropagation();">Link</a>
+                                    <span class="tooltip">
+                                        <span class="tooltip-icon">?</span>
+                                        <span class="tooltip-text">Primary unsubscribe link found: {{ data.unsubscribe_link }}. Clicking 'Unsubscribe' below might use this or a mailto link from an individual email.</span>
+                                    </span>
+                                </span>
+                                {% endif %}
                             </div>
-                        {% endfor %}
+                            <button type="button" class="collapse-button focus-ring" onclick="toggleCollapse('{{ sender_id }}', this)">
+                                <svg class="chevron-icon h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="sender-emails" id="emails-{{ sender_id }}">
+                            {% for email in data.emails %}
+                                <div class="email-row" id="email-{{ email.id }}" onclick="toggleEmailSelection('{{ email.id }}')">
+                                    <div class="flex items-center flex-1 min-w-0 mr-4">
+                                        <input type="checkbox" 
+                                               name="email_ids" 
+                                               value="{{ email.id }}" 
+                                               class="email-checkbox form-checkbox h-4 w-4 text-brand border-border rounded focus:ring-brand mr-3" 
+                                               data-sender="{{ clean_sender }}"
+                                               onclick="event.stopPropagation(); handleEmailCheckboxClick(this);"></input>
+                                        <span class="email-subject text-sm text-foreground truncate" title="{{ email.subject }}">{{ email.subject }}</span>
+                                    </div>
+                                    <span class="text-xs text-muted-foreground flex-shrink-0">{{ email.date }}</span>
+                                </div>
+                            {% endfor %}
+                        </div>
                     </div>
-                </div>
-                
-                {# Add the pagination button block here #}
-                {% if next_page_token %}
-                <div class="px-6 py-4 text-right border-t border-[var(--border-color)] mt-4">
-                    <a href="{{ url_for('scan.scan_emails', token=next_page_token) }}" 
-                       id="next-page-button" 
-                       onclick="setLoading('next-page-button', 'Loading Next...')" 
-                       class="glass-button inline-flex items-center px-4 py-2 text-sm font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--accent-color)]">
-                        Next Page
+                {% endfor %}
+            </div>
+            
+            {% if next_page_token %}
+                <div class="mt-8 text-center">
+                    <a href="{{ url_for('scan.scan_emails', token=next_page_token) }}"
+                       id="scan-more-button"
+                       onclick="setLoading('scan-more-button', 'Loading More...')"
+                       class="btn btn-outline btn-md focus-ring">
+                        Load More Results
                     </a>
                 </div>
-                {% endif %}
-                {# End pagination button block #}
-            </form>
-        {% else %}
-            <div class="px-6 py-4">
-                <p class="text-[var(--text-secondary)]">No emails found with unsubscribe links in this batch or in your inbox.</p>
-                 <a href="{{ url_for('index') }}" class="mt-4 inline-block text-[var(--accent-color)] hover:text-[var(--accent-hover)] hover:underline">Back to Home</a>
-            </div>
-        {% endif %}
-    </div>
+            {% endif %}
+        </form>
+    {% endif %}
 </div>
 
-<!-- Modal for unsubscribe results -->
+<!-- Modal for displaying results -->
 <div id="result-modal" class="modal-overlay modal-hidden">
-    <div id="unsubscribe-results" class="bg-white rounded-lg p-6 shadow-xl max-w-md w-full">
-        <!-- Content will be replaced by the AJAX response -->
+    <div id="modal-content" class="card max-w-md w-full shadow-lg">
+        <!-- Content will be loaded here via HTMX or JS -->
     </div>
 </div>
-
-<!-- Spacer div that will dynamically adjust its height when the action bar appears -->
-<div id="footer-spacer" class="h-0 transition-all duration-200"></div>
-
-{# Define the action bar content here, NOT hidden initially, to be moved by JS #}
-{# The outer bar (#fixed-action-bar in base.html) controls visibility #}
-<div id="fixed-action-bar-content" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-end flex-wrap gap-4">
-    <div class="flex items-center mr-4">
-        <input type="checkbox" id="archive-checkbox" class="form-checkbox h-4 w-4 rounded text-[var(--accent-color)] focus:ring-[var(--accent-color)]">
-        <label for="archive-checkbox" class="ml-2 text-sm text-[var(--text-primary)]">Archive emails after unsubscribing</label>
-        <span class="tooltip">
-            <span class="tooltip-icon">?</span>
-            <span class="tooltip-text">
-                When checked, this will remove the emails from your inbox and archive them after unsubscribing. If unchecked, emails will remain in your inbox.
-            </span>
-        </span>
-    </div>
-    
-    <button type="submit" 
-            form="unsubscribe-form" 
-            id="unsubscribe-button" 
-            class="inline-flex items-center justify-center px-5 py-2 text-sm font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--accent-color)] bg-gradient-to-r from-[#0969da] to-[#8250df] text-white hover:translate-y-[-2px] hover:shadow-md transition-all duration-200" 
-            disabled>
-        <span id="button-action-text">Unsubscribe</span> <span id="selected-count" class="font-bold mx-1">0</span> <span id="selected-text">Emails</span>
-    </button>
-</div>
-
-{# Add informational note about mailto links #}
-<p class="text-xs text-[var(--text-secondary)] mt-3 p-3 rounded-md bg-[var(--hover-bg)] border border-[var(--border-color)]">
-    <strong class="font-medium">Note:</strong> Emails using older "mailto:" unsubscribe links cannot be processed automatically by this tool. You will need to click their links and send the email manually if you wish to unsubscribe.
-</p>
-
 {% endblock %}
 
 {% block scripts %}
 <script>
-    const storageKey = 'selectedEmails';
-    let fixedActionBar = null;      // Initialize as null, find on DOMContentLoaded
-    let actionBarContent = null;    // Initialize as null
-    let selectedCountSpan = null;   // Initialize as null
-    let selectAllCheckbox = null;   // Initialize as null
-    let itemCheckboxes = [];        // Initialize as empty array
-    let unsubscribeButton = null;   // Initialize as null
-    let emailListBody = null;       // Initialize as null
-    let footerSpacer = null;        // Initialize as null
-    let resultModal = null;         // Initialize as null
-    let archiveCheckbox = null;     // Initialize as null
-    let processedEmailIds = new Set(); // Track processed emails
+    // Colors are now passed from the backend and applied via Jinja
+    const storageKey = 'selectedEmailIds'; // Key for sessionStorage
 
-    // --- Storage Management ---
-    function getSelectedEmails() {
+    // --- Storage Helper Functions ---
+    function getSelectedEmailsFromStorage() {
         const stored = sessionStorage.getItem(storageKey);
         try {
-            return stored ? JSON.parse(stored) : {}; // Store as {id: link}
+            // Store as an array of IDs
+            return stored ? JSON.parse(stored) : []; 
         } catch (e) {
             console.error("Error parsing selectedEmails from sessionStorage:", e);
-            return {}; // Return empty object on error
+            return []; // Return empty array on error
         }
     }
 
-    function saveSelectedEmails(emails) {
+    function saveSelectedEmailsToStorage(emailIdsArray) {
         try {
-            sessionStorage.setItem(storageKey, JSON.stringify(emails));
+            sessionStorage.setItem(storageKey, JSON.stringify(emailIdsArray));
         } catch (e) {
             console.error("Error saving selectedEmails to sessionStorage:", e);
         }
     }
 
-    function updateSelectionStorage(emailId, link, type, isSelected) {
-        const selectedEmails = getSelectedEmails();
+    // Update storage based on checkbox state
+    function updateStorageForItem(emailId, isSelected) {
+        let selectedIds = getSelectedEmailsFromStorage();
         if (isSelected) {
-            selectedEmails[emailId] = { link: link, type: type }; // Store link and type
-        } else {
-            delete selectedEmails[emailId];
-        }
-        saveSelectedEmails(selectedEmails);
-    }
-    
-    // --- Color Generation ---
-    function stringToColor(str) {
-        // Simple hash function
-        let hash = 0;
-        for (let i = 0; i < str.length; i++) {
-            hash = str.charCodeAt(i) + ((hash << 5) - hash);
-        }
-        
-        // Convert to a good hue value (0-360)
-        const hue = Math.abs(hash % 360);
-        
-        // Use a fixed saturation and lightness for consistent, readable colors
-        return `hsl(${hue}, 75%, 45%)`;
-    }
-    
-    function getRGBComponents(color) {
-        // For CSS variables, we need RGB components
-        // Create a temporary div
-        const temp = document.createElement('div');
-        temp.style.color = color;
-        document.body.appendChild(temp);
-        
-        // Get the computed style
-        const style = window.getComputedStyle(temp);
-        const rgb = style.color;
-        
-        document.body.removeChild(temp);
-        
-        // Extract RGB values using regex
-        const match = rgb.match(/\d+/g);
-        if (match && match.length >= 3) {
-            return match.slice(0, 3).join(', ');
-        }
-        
-        return '0, 0, 0'; // Default if something goes wrong
-    }
-    
-    function applySenderColors() {
-        document.querySelectorAll('.sender-group').forEach(group => {
-            const sender = group.dataset.sender;
-            if (!sender) return;
-            
-            const color = stringToColor(sender);
-            const rgbComponents = getRGBComponents(color);
-            
-            group.style.setProperty('--sender-color', color);
-            group.style.setProperty('--sender-color-rgb', rgbComponents);
-        });
-    }
-
-    // --- UI Updates ---
-    function updateFixedFooter() {
-        console.log("updateFixedFooter called");
-        if (!fixedActionBar || !unsubscribeButton) {
-            console.error("Cannot update footer - fixedActionBar or unsubscribeButton not found.");
-            return;
-        }
-
-        const selectedEmails = getSelectedEmails();
-        const count = Object.keys(selectedEmails).length;
-        console.log("Selected count:", count);
-
-        // Get unique senders count
-        const uniqueSenders = new Set();
-        document.querySelectorAll('tr.clickable-row').forEach(row => {
-            if (selectedEmails[row.dataset.id]) {
-                uniqueSenders.add(row.dataset.sender);
-            }
-        });
-        const senderCount = uniqueSenders.size;
-        
-        // Update the button text
-        const selectedCountElement = document.getElementById('selected-count');
-        if (selectedCountElement) {
-            selectedCountElement.textContent = count;
-        }
-        
-        // Update the text element based on count
-        const selectedTextElement = document.getElementById('selected-text');
-        if (selectedTextElement) {
-            if (count === 1) {
-                selectedTextElement.textContent = 'Email';
-            } else {
-                selectedTextElement.textContent = 'Emails';
-            }
-            
-            // Add sender info if applicable
-            if (senderCount > 0) {
-                selectedTextElement.textContent += ` from ${senderCount} ${senderCount === 1 ? 'Sender' : 'Senders'}`;
-            }
-        }
-
-        if (count > 0) {
-            console.log("Showing fixed footer");
-            fixedActionBar.classList.remove('hidden');
-            unsubscribeButton.disabled = false;
-            
-            // Adjust the spacer height to match the action bar height
-            if (footerSpacer) {
-                // Get the height of the action bar
-                const actionBarHeight = fixedActionBar.offsetHeight;
-                footerSpacer.style.height = actionBarHeight + 'px';
+            if (!selectedIds.includes(emailId)) {
+                selectedIds.push(emailId);
             }
         } else {
-            console.log("Hiding fixed footer");
-            fixedActionBar.classList.add('hidden');
-            unsubscribeButton.disabled = true;
-            
-            // Reset spacer height when action bar is hidden
-            if (footerSpacer) {
-                footerSpacer.style.height = '0';
-            }
+            selectedIds = selectedIds.filter(id => id !== emailId);
         }
-        
-        // Update button action text based on archive checkbox
-        updateButtonActionText();
-    }
-    
-    function updateButtonActionText() {
-        const archiveCheckbox = document.getElementById('archive-checkbox');
-        const buttonActionSpan = document.getElementById('button-action-text');
-        
-        if (buttonActionSpan && archiveCheckbox) {
-            buttonActionSpan.textContent = archiveCheckbox.checked ? 'Unsubscribe & Archive' : 'Unsubscribe';
-        }
+        saveSelectedEmailsToStorage(selectedIds);
     }
 
+    // --- Initialization ---
+    document.addEventListener('DOMContentLoaded', function() {
+        loadSelectionFromStorage(); // Check boxes based on storage
+        updateActionBar(); // Initial action bar update based on storage
+    });
+
+    // Check checkboxes on the current page based on stored IDs
     function loadSelectionFromStorage() {
-        console.log("loadSelectionFromStorage called");
-        const selectedEmails = getSelectedEmails();
+        const selectedIds = getSelectedEmailsFromStorage();
+        if (selectedIds.length === 0) return;
         
-        itemCheckboxes.forEach(checkbox => {
-            const emailId = checkbox.value;
-            // Check only if it's present and not disabled
-            checkbox.checked = !checkbox.disabled && selectedEmails.hasOwnProperty(emailId);
-        });
-        
-        updateSenderCheckboxes();
-    }
-    
-    function updateSenderCheckboxes() {
-        // For each sender group, check if all emails are selected
-        document.querySelectorAll('.sender-group').forEach(group => {
-            const sender = group.dataset.sender;
-            const checkboxes = group.querySelectorAll('.item-checkbox');
-            const senderCheckbox = group.querySelector('.sender-checkbox');
-            
-            if (checkboxes.length > 0 && senderCheckbox) {
-                let allChecked = true;
-                let anyChecked = false;
-                
-                checkboxes.forEach(cb => {
-                    if (cb.checked) {
-                        anyChecked = true;
-                    } else {
-                        allChecked = false;
-                    }
-                });
-                
-                // Set sender checkbox state
-                senderCheckbox.checked = allChecked;
-                senderCheckbox.indeterminate = anyChecked && !allChecked;
-                
-                // Update strikethrough class
-                const senderHeader = group.querySelector('.sender-header');
-                if (senderHeader) {
-                    if (allChecked) {
-                        senderHeader.classList.add('sender-selected');
-                    } else {
-                        senderHeader.classList.remove('sender-selected');
-                    }
+        selectedIds.forEach(emailId => {
+            const checkbox = document.querySelector(`.email-checkbox[value="${emailId}"]`);
+            if (checkbox) {
+                checkbox.checked = true;
+                // Also update the row's selected state
+                const emailRow = document.getElementById(`email-${emailId}`);
+                if (emailRow) {
+                     emailRow.classList.add('email-selected');
                 }
             }
         });
+        // After checking individual boxes, update sender checkboxes state
+        updateAllSenderCheckboxes(); 
     }
-    
-    // --- Group Toggle ---
-    function toggleSenderGroup(collapseButton) {
-        const header = collapseButton.closest('.sender-header');
-        const group = header.closest('.sender-group');
-        const content = group.querySelector('.sender-emails');
-        content.classList.toggle('collapsed');
-        
-        // Toggle arrow icon
-        const arrow = collapseButton.querySelector('svg');
-        if (content.classList.contains('collapsed')) {
-            arrow.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>';
+
+    function toggleCollapse(senderId, button) {
+        const emailsDiv = document.getElementById(`emails-${senderId}`);
+        const icon = button.querySelector('.chevron-icon');
+        emailsDiv.classList.toggle('collapsed');
+        if (emailsDiv.classList.contains('collapsed')) {
+            // Collapsed state: Pointing up
+            icon.innerHTML = '<path fill-rule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clip-rule="evenodd" />';
         } else {
-            arrow.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>';
+            // Expanded state: Pointing down
+            icon.innerHTML = '<path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />';
         }
     }
-    
-    // --- Handle sender name click ---
-    function handleSenderNameClick(event, nameContainer) {
-        // Stop propagation to prevent other handlers from firing
-        event.stopPropagation();
-        
-        // Find the group and checkbox
-        const group = nameContainer.closest('.sender-group');
-        if (!group) {
-            console.error("Could not find sender group");
-            return;
-        }
-        
-        const senderCheckbox = group.querySelector('.sender-checkbox');
-        if (!senderCheckbox) {
-            console.error("Could not find sender checkbox");
-            return;
-        }
-        
-        // Toggle the checkbox
+
+    function toggleSenderSelection(senderId) {
+        const senderCheckbox = document.getElementById(`select-sender-${senderId}`);
         senderCheckbox.checked = !senderCheckbox.checked;
-        
-        // Get the sender from the data attribute
-        const sender = group.dataset.sender;
-        if (!sender) {
-            console.error("Could not find sender data");
-            return;
-        }
-        
-        // Call the checkbox click handler
-        handleSenderCheckboxClick(senderCheckbox, sender);
+        selectAllSenderEmails(senderCheckbox, senderId);
     }
 
-    // --- Event Handlers ---
-    function handleSingleCheckboxClick(checkbox) {
-        // Prevent action if checkbox is disabled (mailto)
-        if (checkbox.disabled) {
-            console.log("Ignoring click on disabled (mailto) checkbox");
-            return;
-        }
-        console.log("handleSingleCheckboxClick called for:", checkbox.value, "Checked:", checkbox.checked);
-        const row = checkbox.closest('tr');
-        if (!row) {
-            console.error("Could not find parent row for checkbox", checkbox);
-            return;
-        }
-        // Get link and type from data attributes
-        const emailId = row.dataset.id;
-        const link = row.dataset.link;
-        const type = row.dataset.type;
-        if (!emailId || link === undefined || type === undefined) {
-             console.error("Missing data-id, data-link, or data-type on row", row);
-             return;
-        }
+    function selectAllSenderEmails(senderCheckbox, senderId) {
+        const emailsDiv = document.getElementById(`emails-${senderId}`);
+        const emailCheckboxes = emailsDiv.querySelectorAll('.email-checkbox');
+        const senderGroup = document.getElementById(`sender-group-${senderId}`);
+        const isChecked = senderCheckbox.checked;
 
-        // Pass link type to storage function if needed, or filter later
-        updateSelectionStorage(emailId, link, type, checkbox.checked);
-        updateFixedFooter(); // Update footer visibility and count
-        updateSenderCheckboxes(); // Update sender checkboxes
+        emailCheckboxes.forEach(cb => {
+            cb.checked = isChecked;
+            const emailRow = document.getElementById(`email-${cb.value}`);
+            if(emailRow) {
+                emailRow.classList.toggle('email-selected', isChecked);
+            }
+            // Update storage for each item
+            updateStorageForItem(cb.value, isChecked);
+        });
+        senderGroup.classList.toggle('sender-selected', isChecked);
+        updateActionBar(); // Update count based on storage
+    }
+
+    function toggleEmailSelection(emailId) {
+         const emailCheckbox = document.querySelector(`.email-checkbox[value="${emailId}"]`);
+         if (emailCheckbox) {
+            emailCheckbox.checked = !emailCheckbox.checked;
+            handleEmailCheckboxClick(emailCheckbox);
+         } 
+    }
+
+    function handleEmailCheckboxClick(emailCheckbox) {
+        const emailRow = document.getElementById(`email-${emailCheckbox.value}`);
+        if (emailRow) {
+             emailRow.classList.toggle('email-selected', emailCheckbox.checked);
+        }
+        // Update storage for this item
+        updateStorageForItem(emailCheckbox.value, emailCheckbox.checked);
+        
+        // Update parent sender checkbox state
+        updateSenderCheckboxState(emailCheckbox.dataset.sender);
+
+        updateActionBar(); // Update count based on storage
+    }
+
+    // Helper to update a single sender checkbox based on its children
+    function updateSenderCheckboxState(sender) {
+        const senderId = sender.replace(' ', '-').replace('<', '').replace('>', '').replace('@', '-').replace('.', '-');
+        const senderCheckbox = document.getElementById(`select-sender-${senderId}`);
+        const senderGroup = document.getElementById(`sender-group-${senderId}`);
+        if (!senderCheckbox || !senderGroup) return; // Sender group might not be on this page
+        
+        const allEmailsForSender = senderGroup.querySelectorAll(`.email-checkbox[data-sender="${sender}"]`);
+        if (allEmailsForSender.length === 0) return; // No emails for this sender on the page
+        
+        const allChecked = Array.from(allEmailsForSender).every(cb => cb.checked);
+        const someChecked = Array.from(allEmailsForSender).some(cb => cb.checked);
+        
+        senderCheckbox.checked = allChecked;
+        senderCheckbox.indeterminate = someChecked && !allChecked;
+        senderGroup.classList.toggle('sender-selected', someChecked);
     }
     
-    function handleSenderCheckboxClick(checkbox, sender) {
-        console.log("handleSenderCheckboxClick for sender:", sender);
-        const group = checkbox.closest('.sender-group');
-        const checkboxes = group.querySelectorAll('.item-checkbox');
-        const checked = checkbox.checked;
-        
-        checkboxes.forEach(cb => {
-            // Only change state if the checkbox is NOT disabled (i.e., not mailto)
-            if (!cb.disabled && cb.checked !== checked) {
-                cb.checked = checked;
-                const row = cb.closest('tr');
-                const emailId = row.dataset.id;
-                const link = row.dataset.link;
-                const type = row.dataset.type;
-                updateSelectionStorage(emailId, link, type, checked);
-            }
+    // Helper to update all sender checkboxes on the page (e.g., after load)
+    function updateAllSenderCheckboxes() {
+        const senderCheckboxes = document.querySelectorAll('.sender-checkbox');
+        senderCheckboxes.forEach(cb => {
+            updateSenderCheckboxState(cb.dataset.sender);
         });
-        
-        updateFixedFooter(); // Update footer visibility and count
-        updateSenderCheckboxes(); // Update strikethrough
     }
 
-    // Row click handler
-    function handleRowClick(event) {
-        console.log("Row click listener fired. Target:", event.target);
-        const row = event.target.closest('tr'); // Find closest row first
-        if (!row || row.classList.contains('opacity-75')) { // Ignore if mailto row (check class)
-            console.log("Row click: Not inside a clickable HTTP row or is mailto row.");
-            return;
-        }
-        console.log("Row click: Found clickable row:", row);
-
-        // Ensure click wasn't directly on the link or checkbox itself
-        if (event.target.matches('input.item-checkbox, a.email-link, a.email-link *')) {
-            console.log("Row click: Click was on checkbox or link, ignoring.");
-            return;
-        }
-
-        const checkbox = row.querySelector('.item-checkbox');
-        if (checkbox && !checkbox.disabled) { // Check if checkbox exists and is not disabled
-            console.log("Row click: Found enabled checkbox, toggling and calling handler.");
-            checkbox.checked = !checkbox.checked;
-            handleSingleCheckboxClick(checkbox); // Call the main handler
-        } else {
-            console.error("Row click: Could not find enabled checkbox in row:", row);
-        }
+    function getSelectedEmails() {
+        return Array.from(document.querySelectorAll('.email-checkbox:checked')).map(cb => cb.value);
     }
 
-    // Form submission handler - Refactored for client-side HTTP fetches
-    async function handleUnsubscribeSubmit(event) { // Make async for await
-        event.preventDefault(); 
+    function updateActionBar() {
+        const selectedIdsFromStorage = getSelectedEmailsFromStorage(); // Get total count from storage
+        const count = selectedIdsFromStorage.length;
+        const actionBar = document.getElementById('fixed-action-bar');
         
-        const selectedEmailsData = getSelectedEmails();
-        const ids = Object.keys(selectedEmailsData);
-        const shouldArchive = document.getElementById('archive-checkbox').checked;
-        
-        // Filter for emails with HTTP links
-        const httpEmails = ids.map(id => ({ id: id, ...selectedEmailsData[id] }))
-                              .filter(email => email.type === 'header_http');
-                              
-        const mailtoEmails = ids.map(id => ({ id: id, ...selectedEmailsData[id] }))
-                                .filter(email => email.type === 'header_mailto');
-
-        if (httpEmails.length === 0) {
-            alert("Please select at least one email with a processable (non-mailto) unsubscribe link.");
-            // If only mailto were selected, maybe offer to open them?
-            if (mailtoEmails.length > 0) {
-                 if (confirm(`You only selected emails with mailto links (${mailtoEmails.length}). These require manual sending. Open them now?`)) {
-                     mailtoEmails.forEach(email => {
-                         console.log(`Opening mailto: ${email.link}`);
-                         window.open(email.link); // Use window.open instead of location.href
-                     });
-                 }
-            }
-            return false;
-        }
-
-        // Store IDs to be processed (for removal later)
-        processedEmailIds.clear();
-        httpEmails.forEach(email => processedEmailIds.add(email.id));
-        // Note: We don't add mailto IDs to processedEmailIds as they aren't actioned
-
-        setLoading('unsubscribe-button', 'Processing...');
-
-        // Show modal with initial processing state
-        if (resultModal) {
-            document.getElementById('unsubscribe-results').innerHTML = `
-                <div class="text-center p-6">
-                    <div class="inline-block rounded-full border-4 border-t-transparent border-[var(--accent-color)] border-solid h-12 w-12 animate-spin mb-4"></div>
-                    <p class="text-gray-600">Visiting unsubscribe links...</p>
-                    <p id="progress-text" class="text-sm text-[var(--text-secondary)] mt-2"></p>
+        if (count > 0) {
+            actionBar.innerHTML = `
+                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center">
+                    <span class="text-sm font-medium text-foreground">${count} email${count > 1 ? 's' : ''} selected</span>
+                    <div class="flex items-center space-x-3">
+                        <label for="archive-toggle" class="flex items-center text-sm text-muted-foreground">
+                            <input type="checkbox" id="archive-toggle" name="archive" checked class="form-checkbox h-4 w-4 text-brand border-border rounded focus:ring-brand mr-2">
+                            Also archive selected?
+                        </label>
+                        <button id="unsubscribe-button" type="button" onclick="performUnsubscribe()" class="btn btn-brand btn-sm focus-ring">
+                            Unsubscribe & Archive
+                        </button>
+                    </div>
                 </div>
             `;
-            resultModal.classList.remove('modal-hidden');
-        }
-        const progressTextElement = document.getElementById('progress-text');
-
-        // Process HTTP links client-side
-        let http_success_count = 0;
-        let http_fail_count = 0;
-        const ids_to_archive = [];
-        
-        for (let i = 0; i < httpEmails.length; i++) {
-            const email = httpEmails[i];
-            if (progressTextElement) {
-                progressTextElement.textContent = `Processing link ${i + 1} of ${httpEmails.length}...`;
-            }
-            try {
-                console.log(`Fetching (no-cors): ${email.link}`);
-                await fetch(email.link, { 
-                    method: 'GET', 
-                    mode: 'no-cors' 
-                });
-                http_success_count++;
-                if (shouldArchive) {
-                    ids_to_archive.push(email.id);
-                }
-            } catch (error) {
-                console.error(`Failed to fetch ${email.link} (may be expected with no-cors):`, error);
-                // http_fail_count++; // Don't count fetch errors as definite failure with no-cors
-                // Still archive even if fetch failed? Let's assume yes for now.
-                 if (shouldArchive) {
-                    ids_to_archive.push(email.id);
-                }
-            }
-        }
-        
-        console.log(`Client-side fetch complete. Success: ${http_success_count}, Fail: ${http_fail_count}`);
-        if (progressTextElement) {
-             progressTextElement.textContent = `Link processing finished. ${http_fail_count > 0 ? `(${http_fail_count} failed)` : ''}`;
-        }
-
-        // --- Archive Emails (if requested and any succeeded) ---
-        let archive_success = false;
-        let archive_message = "Archiving skipped.";
-        
-        if (shouldArchive && ids_to_archive.length > 0) {
-            if (progressTextElement) progressTextElement.textContent += " Archiving...";
-            console.log(`Requesting archive for ${ids_to_archive.length} IDs:`, ids_to_archive);
-            try {
-                const archiveResponse = await fetch("{{ url_for('scan.archive_emails') }}", { // Use correct endpoint
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
-                    body: JSON.stringify({ message_ids: ids_to_archive })
-                });
-
-                const archiveResult = await archiveResponse.json();
-                
-                if (archiveResponse.ok && archiveResult.success) {
-                    archive_success = true;
-                    archive_message = archiveResult.message || `Archived ${ids_to_archive.length} emails.`;
-                    console.log("Archive successful:", archive_message);
-                } else {
-                    archive_message = `Archiving failed: ${archiveResult.error || `Status ${archiveResponse.status}`}`;
-                    console.error("Archive failed:", archiveResult);
-                    // Don't remove IDs if archive failed?
-                    processedEmailIds.clear(); // Clear IDs so they aren't removed on modal close
-                }
-            } catch (error) {
-                console.error('Error during archive request:', error);
-                archive_message = "Error occurred during archive request.";
-                processedEmailIds.clear(); // Clear IDs so they aren't removed on modal close
-            }
-            if (progressTextElement) progressTextElement.textContent = archive_message;
-        }
-
-        // --- Update Modal with Final Result --- 
-        hideLoading('unsubscribe-button');
-        
-        const final_message = `Processed ${http_success_count} unsubscribe links${http_fail_count > 0 ? ` (${http_fail_count} failed)` : ''}. ${shouldArchive ? archive_message : 'Emails not archived.'}`;
-        
-        // Use the backend renderer for consistency, passing it the overall status
-        const overall_success = http_fail_count === 0 && (!shouldArchive || ids_to_archive.length === 0 || archive_success);
-        if (resultModal) {
-             document.getElementById('unsubscribe-results').innerHTML = 
-                render_unsubscribe_modal_content_js(overall_success, final_message);
-        }
-
-        // Note: removeProcessedEmails (which clears storage) is called when user clicks 'Done' in success modal
-        // or 'Close' in error modal (but closeErrorMessage prevents removal by clearing processedEmailIds)
-    }
-
-     // --- JS version of the error modal renderer for fallback ---
-     function render_unsubscribe_modal_content_js(success=false, message="") {
-         if (success) {
-             const status_message = message || "Request processed successfully!";
-             // Note: Cannot display http_link reliably here as it wasn't passed
-             const html = `
-             <div class="text-center p-6 flex flex-col items-center">
-                 <div class="checkmark-container mb-4">
-                     <svg class="checkmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52">
-                         <circle class="checkmark-circle" cx="26" cy="26" r="25" fill="none"/>
-                         <path class="checkmark-check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
-                     </svg>
-                 </div>
-                 <h3 class="text-xl font-semibold text-gray-700 mb-2">Success!</h3>
-                 <p class="text-gray-600">${status_message}</p>
-                 <button class="mt-6 px-6 py-2 bg-[var(--accent-color)] text-white rounded-md hover:bg-[var(--accent-hover)]" onclick="window.removeProcessedEmails()">Done</button>
-             </div>
-             `;
-             return html;
-        } else { // Error case
-             const status_message = message || "An unexpected error occurred.";
-             return `
-             <div class="bg-white rounded-lg p-6 text-center flex flex-col items-center">
-                 <div class="error-container mb-4">
-                     <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-red-500" viewBox="0 0 20 20" fill="currentColor">
-                         <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
-                     </svg>
-                 </div>
-                 <h3 class="text-xl font-semibold text-red-600 mb-2">Error</h3>
-                 <p class="text-gray-600">${status_message}</p>
-                 <button class="mt-4 px-4 py-2 bg-[var(--accent-color)] text-white rounded-md hover:bg-[var(--accent-hover)]" onclick="window.closeErrorMessage()">Close</button>
-             </div>
-             `;
-         }
-         // Should not reach here, but return empty string just in case
-         return ""; 
-     }
-
-    // Function to remove processed emails from list (Called by 'Done' button in success modal)
-    function removeProcessedEmails() {
-        console.log("removeProcessedEmails called");
-        if (resultModal) { 
-            resultModal.classList.add('modal-hidden');
-        }
-        if (processedEmailIds.size === 0) {
-            console.log("No processed IDs to remove.");
-            return; 
-        }
-
-        processedEmailIds.forEach(emailId => {
-             document.querySelectorAll(`tr[data-id="${emailId}"]`).forEach(row => {
-                 const senderGroup = row.closest('.sender-group');
-                 row.classList.add('fade-out');
-                 setTimeout(() => {
-                     row.remove();
-                     if (senderGroup && senderGroup.querySelectorAll('tbody tr').length === 0) {
-                         senderGroup.classList.add('fade-out');
-                         setTimeout(() => {
-                             senderGroup.remove();
-                             if (document.querySelectorAll('#email-list-body .sender-group').length === 0) {
-                                 document.getElementById('email-list-body').innerHTML = '<p class="p-6 text-[var(--text-secondary)]">All selected items processed.</p>';
-                                 updateFixedFooter(); 
-                             }
-                         }, 500); 
-                     }
-                 }, 500); 
-             });
-         });
-
-        // Clear the set after initiating removals
-        processedEmailIds.clear();
-
-        // Clear selection storage BEFORE updating the footer
-        saveSelectedEmails({}); 
-
-        // Update the action bar (should hide it as count is now 0)
-        updateFixedFooter();
-    }
-
-     // Function to close error message (called by 'Close' button in error modal)
-    function closeErrorMessage() {
-        console.log("closeErrorMessage called");
-        if (resultModal) {
-            resultModal.classList.add('modal-hidden');
-        }
-         processedEmailIds.clear();
-    }
-
-    // --- Initial Load ---
-    document.addEventListener('DOMContentLoaded', () => {
-        console.log("DOMContentLoaded event fired");
-        console.log("Document Referrer:", document.referrer); // DEBUG
-
-        // Find elements *after* DOM is loaded
-        fixedActionBar = document.getElementById('fixed-action-bar');
-        actionBarContent = document.getElementById('fixed-action-bar-content');
-        footerSpacer = document.getElementById('footer-spacer');
-        resultModal = document.getElementById('result-modal');
-        archiveCheckbox = document.getElementById('archive-checkbox');
-        // selectedCountSpan will be found inside updateFixedFooter
-        itemCheckboxes = document.querySelectorAll('.item-checkbox');
-        unsubscribeButton = document.getElementById('unsubscribe-button');
-        emailListBody = document.getElementById('email-list-body');
-
-        // Verify crucial elements needed for setup
-        if (!fixedActionBar) console.error("#fixed-action-bar not found!");
-        if (!actionBarContent) console.error("#fixed-action-bar-content not found!");
-        if (!emailListBody) console.error("#email-list-body not found!");
-        if (!footerSpacer) console.error("#footer-spacer not found!");
-        if (!resultModal) console.error("#result-modal not found!");
-        if (!archiveCheckbox) console.error("#archive-checkbox not found!");
-        // unsubscribeButton check is implicitly done in updateFixedFooter
-
-        // *** Check if this is a page refresh/initial load vs pagination ***
-        const referrerUrl = document.referrer ? new URL(document.referrer) : null;
-        const currentUrl = new URL(window.location.href);
-        const isPagination = referrerUrl && referrerUrl.pathname === currentUrl.pathname; // Came from /scan
-
-        if (!isPagination) {
-            console.log("Referrer is not /scan or no referrer. Clearing selection storage.");
-            sessionStorage.removeItem(storageKey);
-        } else {
-            console.log("Referrer is /scan. Assuming pagination, keeping selection storage.");
-        }
-
-        // Move content to fixed bar (do this before updating footer)
-        if (fixedActionBar && actionBarContent && !fixedActionBar.contains(actionBarContent)) {
-            console.log("Moving actionBarContent to fixedActionBar on load");
-            fixedActionBar.appendChild(actionBarContent);
-        } else if (fixedActionBar && fixedActionBar.contains(actionBarContent)) {
-            console.log("actionBarContent already in fixedActionBar on load");
-        }
-
-        // Add event listeners
-        if (emailListBody) {
-            emailListBody.addEventListener('click', handleRowClick);
-        }
-        
-        // Add event listener for archive checkbox
-        if (archiveCheckbox) {
-            archiveCheckbox.addEventListener('change', updateButtonActionText);
-        }
-        
-        // Expand/collapse all sender groups on load
-        document.querySelectorAll('.sender-emails').forEach(content => {
-            content.classList.remove('collapsed');
-        });
-        
-        // Apply custom colors to sender groups
-        applySenderColors();
-
-        // Load state and set initial UI *after* potential clearing
-        loadSelectionFromStorage();
-        updateFixedFooter(); // This sets visibility based on storage
-        
-        // Make functions globally available (required for the modal buttons)
-        window.removeProcessedEmails = removeProcessedEmails;
-        window.closeErrorMessage = closeErrorMessage;
-        window.toggleSenderGroup = toggleSenderGroup;
-        window.handleSenderNameClick = handleSenderNameClick;
-    });
-    
-    // Add fade-out animation style
-    document.head.insertAdjacentHTML('beforeend', `
-        <style>
-            @keyframes fadeOut {
-                from { opacity: 1; }
-                to { opacity: 0; }
-            }
+            actionBar.classList.remove('hidden');
             
-            .fade-out {
-                animation: fadeOut 0.5s forwards;
+            // Update button text based on archive toggle
+            const archiveToggle = document.getElementById('archive-toggle');
+            const unsubscribeButton = document.getElementById('unsubscribe-button');
+            archiveToggle.addEventListener('change', () => {
+                 unsubscribeButton.textContent = archiveToggle.checked ? 'Unsubscribe & Archive' : 'Unsubscribe Only';
+            });
+            unsubscribeButton.textContent = archiveToggle.checked ? 'Unsubscribe & Archive' : 'Unsubscribe Only'; // Initial text
+
+        } else {
+            actionBar.classList.add('hidden');
+            actionBar.innerHTML = ''; // Clear content
+        }
+    }
+
+    async function performUnsubscribe() {
+        const selectedIdsFromStorage = getSelectedEmailsFromStorage(); // Get ALL selected IDs
+        if (selectedIdsFromStorage.length === 0) {
+            alert('Please select at least one email to unsubscribe.');
+            return;
+        }
+        
+        // Store the IDs we are about to process for removal later
+        window.processedEmailIds = [...selectedIdsFromStorage]; 
+        
+        const archive = document.getElementById('archive-toggle').checked;
+        const buttonId = 'unsubscribe-button';
+        setLoading(buttonId, archive ? 'Processing...' : 'Processing...'); // Use a generic message
+
+        const formData = new FormData();
+        // Send ALL selected IDs from storage to the backend
+        selectedIdsFromStorage.forEach(id => formData.append('email_ids', id));
+        formData.append('archive', archive ? 'true' : 'false');
+        
+        const url = "{{ url_for('scan.unsubscribe_and_archive') }}";
+
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                body: formData
+            });
+            
+            const resultData = await response.json(); // Expect JSON
+            
+            if (response.ok && resultData.success) {
+                showModal(renderSuccessModalContent(resultData.message, resultData.http_link));
+                // Clear storage ONLY on successful processing of ALL items
+                saveSelectedEmailsToStorage([]); 
+            } else {
+                // Use error message from backend if available
+                const errorMessage = resultData.error || `Request failed with status ${response.status}`;
+                showModal(renderErrorModalContent(errorMessage));
+                 // Don't clear storage on failure
+                 window.processedEmailIds = []; // Don't remove items on failure
             }
-        </style>
-    `);
+
+        } catch (error) {
+            console.error('Error unsubscribing:', error);
+            showModal(renderErrorModalContent('Network error occurred. Please try again.'));
+             window.processedEmailIds = [];
+        } finally {
+            hideLoading(buttonId);
+            // Action bar update happens in closeModal or removeProcessedEmails
+        }
+    }
+
+    async function performArchiveActionOnly() {
+        const selectedIdsFromStorage = getSelectedEmailsFromStorage(); // Get ALL selected IDs
+        if (selectedIdsFromStorage.length === 0) {
+            alert('Please select at least one email to archive.');
+            return;
+        }
+        
+        // Store the IDs we are about to process for removal later
+        window.processedEmailIds = [...selectedIdsFromStorage];
+
+        const buttonId = 'archive-only-button';
+        setLoading(buttonId, 'Archiving...');
+
+        const formData = new FormData();
+        // Send ALL selected IDs from storage to the backend
+        selectedIdsFromStorage.forEach(id => formData.append('email_ids', id));
+        
+        const url = "{{ url_for('scan.archive_emails') }}"; 
+
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                body: formData
+            });
+            const resultData = await response.json(); // Expect JSON
+
+            if (response.ok && resultData.success) {
+                showModal(renderSuccessModalContent(resultData.message));
+                // Clear storage ONLY on successful processing of ALL items
+                saveSelectedEmailsToStorage([]); 
+            } else {
+                 const errorMessage = resultData.error || `Request failed with status ${response.status}`;
+                 showModal(renderErrorModalContent(errorMessage));
+                 window.processedEmailIds = []; // Don't remove items or clear storage on failure
+            }
+
+        } catch (error) {
+            console.error('Error archiving:', error);
+            showModal(renderErrorModalContent('Network error occurred during archiving. Please try again.'));
+             window.processedEmailIds = [];
+        } finally {
+            hideLoading(buttonId);
+             // Action bar update happens in closeModal or removeProcessedEmails
+        }
+    }
+
+    function showModal(content) {
+        const modal = document.getElementById('result-modal');
+        const modalContent = document.getElementById('modal-content');
+        modalContent.innerHTML = content;
+        modal.classList.remove('modal-hidden');
+    }
+
+    function closeModal() {
+        const modal = document.getElementById('result-modal');
+        modal.classList.add('modal-hidden');
+        document.getElementById('modal-content').innerHTML = ''; // Clear content
+        updateActionBar(); // Update after closing modal
+    }
+    
+    // Global functions for modal buttons
+    window.removeProcessedEmails = function() {
+        // Use the stored processedEmailIds set during the action call
+        if (window.processedEmailIds && window.processedEmailIds.length > 0) {
+            window.processedEmailIds.forEach(emailId => {
+                const emailRow = document.getElementById(`email-${emailId}`);
+                const sender = emailRow?.querySelector('.email-checkbox')?.dataset.sender;
+                emailRow?.remove();
+                
+                // Check if sender group is now empty
+                if (sender) {
+                    const senderId = sender.replace(' ', '-').replace('<', '').replace('>', '').replace('@', '-').replace('.', '-');
+                    const senderGroup = document.getElementById(`sender-group-${senderId}`);
+                    // Check if the email list div exists and has no more email rows
+                    const emailsDiv = senderGroup?.querySelector('.sender-emails');
+                    if (emailsDiv && emailsDiv.querySelectorAll('.email-row').length === 0) {
+                        senderGroup.remove();
+                    }
+                }
+            });
+            window.processedEmailIds = []; // Clear the list
+        }
+        closeModal(); // This calls updateActionBar which reads the (now empty) storage
+    }
+
+    window.closeErrorMessage = function() {
+        closeModal();
+    }
+
+    // Render success modal content dynamically
+    function renderSuccessModalContent(message, http_link = null) {
+        let linkHtml = '';
+        if (http_link) {
+            linkHtml = `<p class="text-sm mt-2 text-muted-foreground">If needed, you can <a href="${http_link}" target="_blank" class="text-brand hover:underline focus-ring">visit the link manually</a>.</p>`;
+        }
+        return `
+        <div class="bg-background rounded-lg p-6 text-center flex flex-col items-center">
+            <div class="checkmark-container mb-4">
+                <svg class="checkmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52">
+                    <circle class="checkmark-circle" cx="26" cy="26" r="25" fill="none"/>
+                    <path class="checkmark-check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
+                </svg>
+            </div>
+            <h3 class="text-xl font-semibold text-success mb-2">Success!</h3>
+            <p class="text-foreground">${message || "Operation completed successfully."}</p>
+            ${linkHtml}
+            <button 
+                class="mt-6 btn btn-primary btn-md focus-ring"
+                onclick="window.removeProcessedEmails()">
+                Done
+            </button>
+        </div>`;
+    }
+
+    // Render error modal content dynamically (no changes needed here, already good)
+    function renderErrorModalContent(message) {
+        return `
+        <div class="bg-background rounded-lg p-6 text-center flex flex-col items-center">
+            <div class="error-container mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-destructive" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                </svg>
+            </div>
+            <h3 class="text-xl font-semibold text-destructive mb-2">Error</h3>
+            <p class="text-muted-foreground">${message}</p>
+            <button 
+                class="mt-4 btn btn-secondary focus-ring"
+                onclick="closeModal()">
+                Close
+            </button>
+        </div>`;
+    }
+
 </script>
 {% endblock %} 
