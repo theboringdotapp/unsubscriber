@@ -558,14 +558,14 @@ def scan_emails():
         flash(f"An error occurred during email scan: {e}", "error")
         print(f"!!! ERROR during scan loop: {e} !!!") # DEBUG
         # Render template even on error, showing potentially partial results
-        return render_template('scan_results.html', subscriptions=found_subscriptions, error=str(e))
+        return render_template('scan_results.html', emails=found_subscriptions, error=str(e))
 
 
     if not found_subscriptions:
         flash("No emails with unsubscribe links found in the recent scan.", "info")
 
     # Pass the found subscriptions to the template
-    return render_template('scan_results.html', subscriptions=found_subscriptions)
+    return render_template('scan_results.html', emails=found_subscriptions)
 
 
 @app.route('/unsubscribe', methods=['POST'])
