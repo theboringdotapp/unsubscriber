@@ -16,7 +16,7 @@
         <div class="bg-[var(--hover-bg)] rounded-lg p-6 mb-8">
             <p class="text-lg mb-2">Welcome back!</p>
             <p class="text-[var(--text-secondary)] mb-4">Ready to find emails you can unsubscribe from?</p>
-            <a href="{{ url_for('scan_emails') }}"
+            <a href="{{ url_for('scan.scan_emails') }}"
                id="scan-button"
                onclick="setLoading('scan-button', 'Scanning...')"
                class="inline-flex items-center justify-center px-6 py-3 text-base font-medium rounded-md bg-[var(--accent-color)] text-white hover:bg-[var(--accent-hover)] hover:text-white transition-all shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--accent-color)]">

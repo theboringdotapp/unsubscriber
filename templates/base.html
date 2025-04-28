@@ -162,11 +162,11 @@
                 </div>
                 <div class="flex items-center">
                     {% if authenticated %}
-                        <a href="{{ url_for('logout') }}" class="glass-button font-medium py-2 px-4 rounded-md text-sm">
+                        <a href="{{ url_for('auth.logout') }}" class="glass-button font-medium py-2 px-4 rounded-md text-sm">
                             Logout
                         </a>
                     {% else %}
-                         <a href="{{ url_for('login') }}" class="glass-button font-medium py-2 px-4 rounded-md text-sm">
+                         <a href="{{ url_for('auth.login') }}" class="glass-button font-medium py-2 px-4 rounded-md text-sm">
                              Login with Google
                          </a>
                     {% endif %}
