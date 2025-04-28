@@ -273,7 +273,8 @@ def get_gmail_service():
 
     # If we reach here, creds should be valid (either loaded or refreshed)
     try:
-        service = build('gmail', 'v1', credentials=creds)
+        # Disable discovery cache for Vercel's ephemeral filesystem
+        service = build('gmail', 'v1', credentials=creds, cache_discovery=False)
         print("Gmail service built successfully.")
         return service
     except Exception as e:
