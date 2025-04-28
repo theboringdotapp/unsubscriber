@@ -1,0 +1,40 @@
+{
+    "version": 2,
+    "functions": {
+        "api/auth.py": {
+            "runtime": "python3.9"
+        },
+        "api/scan.py": {
+            "runtime": "python3.9"
+        },
+        "api/unsubscribe.py": {
+            "runtime": "python3.9"
+        }
+    },
+    "routes": [
+        {
+            "src": "/api/auth/login",
+            "dest": "/api/auth.py"
+        },
+        {
+            "src": "/api/auth/callback",
+            "dest": "/api/auth.py"
+        },
+        {
+            "src": "/api/auth/refresh",
+            "dest": "/api/auth.py"
+        },
+        {
+            "src": "/api/scan",
+            "dest": "/api/scan.py"
+        },
+        {
+            "src": "/api/unsubscribe",
+            "dest": "/api/unsubscribe.py"
+        },
+        {
+            "src": "/(.*)",
+            "dest": "/frontend/$1"
+        }
+    ]
+}

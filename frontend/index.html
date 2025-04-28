@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gmail Bulk Unsubscriber</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Gmail Bulk Unsubscriber</h1>
+        </header>
+        
+        <main id="app">
+            <!-- Login section -->
+            <section id="login-section" class="section">
+                <div class="card">
+                    <h2>Welcome</h2>
+                    <p>This tool helps you easily unsubscribe from unwanted email lists by:</p>
+                    <ul>
+                        <li>Scanning your Gmail for emails with unsubscribe links</li>
+                        <li>Letting you select which ones to unsubscribe from</li>
+                        <li>Visiting the unsubscribe links and archiving the emails</li>
+                    </ul>
+                    <div class="login-btn-container">
+                        <button id="login-btn" class="btn primary">
+                            <i class="fab fa-google"></i> Login with Google
+                        </button>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Scanning section (hidden by default) -->
+            <section id="scan-section" class="section hidden">
+                <div class="card">
+                    <h2>Scan Your Inbox</h2>
+                    <p>Click below to scan your recent emails for unsubscribe links.</p>
+                    <div class="form-group">
+                        <label for="max-results">Maximum emails to scan:</label>
+                        <input type="number" id="max-results" value="100" min="10" max="500">
+                    </div>
+                    <div class="form-group">
+                        <label for="query">Search filter (optional):</label>
+                        <input type="text" id="query" placeholder="e.g., category:promotions">
+                    </div>
+                    <div class="btn-container">
+                        <button id="scan-btn" class="btn primary">
+                            <i class="fas fa-search"></i> Scan Emails
+                        </button>
+                        <button id="logout-btn" class="btn secondary">
+                            <i class="fas fa-sign-out-alt"></i> Logout
+                        </button>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Results section (hidden by default) -->
+            <section id="results-section" class="section hidden">
+                <div class="card">
+                    <h2>Unsubscribe Options</h2>
+                    <div class="results-header">
+                        <p><span id="results-count">0</span> emails with unsubscribe links found</p>
+                        <div class="selection-controls">
+                            <button id="select-all-btn" class="btn small">Select All</button>
+                            <button id="deselect-all-btn" class="btn small">Deselect All</button>
+                        </div>
+                    </div>
+                    
+                    <div class="email-list" id="email-list">
+                        <!-- Emails will be inserted here by JavaScript -->
+                    </div>
+                    
+                    <div class="btn-container">
+                        <button id="unsubscribe-btn" class="btn primary">
+                            <i class="fas fa-unlink"></i> Unsubscribe & Archive Selected
+                        </button>
+                        <button id="back-btn" class="btn secondary">
+                            <i class="fas fa-arrow-left"></i> Back to Scan
+                        </button>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Processing section (hidden by default) -->
+            <section id="processing-section" class="section hidden">
+                <div class="card">
+                    <h2>Processing</h2>
+                    <div class="progress-container">
+                        <div class="progress-bar" id="progress-bar">
+                            <div class="progress" id="progress"></div>
+                        </div>
+                        <p id="progress-text">Processing 0 of 0 emails...</p>
+                    </div>
+                    <div id="processing-results">
+                        <!-- Results will be inserted here by JavaScript -->
+                    </div>
+                    <div class="btn-container">
+                        <button id="done-btn" class="btn primary hidden">
+                            <i class="fas fa-check"></i> Done
+                        </button>
+                    </div>
+                </div>
+            </section>
+        </main>
+        
+        <footer>
+            <p>This tool accesses your Gmail account via Google's OAuth. Your data remains private and no emails are stored.</p>
+        </footer>
+    </div>
+    
+    <!-- JavaScript -->
+    <script src="js/auth.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html> 

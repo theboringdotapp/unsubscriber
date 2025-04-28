@@ -1,0 +1,7 @@
+google-api-python-client>=2.0
+google-auth-oauthlib>=0.5
+google-auth>=2.0
+requests>=2.20
+python-jose>=3.3.0
+functions-framework>=3.0.0
+flask-cors>=3.0.10 

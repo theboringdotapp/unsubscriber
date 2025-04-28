@@ -1,0 +1,27 @@
+[build]
+  publish = "frontend"
+
+[functions]
+  directory = "netlify/functions"
+
+# Create redirects to route API calls to functions
+[[redirects]]
+  from = "/api/auth/*"
+  to = "/.netlify/functions/auth"
+  status = 200
+
+[[redirects]]
+  from = "/api/scan"
+  to = "/.netlify/functions/scan"
+  status = 200
+
+[[redirects]]
+  from = "/api/unsubscribe"
+  to = "/.netlify/functions/unsubscribe"
+  status = 200
+
+# For SPA routing
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200 

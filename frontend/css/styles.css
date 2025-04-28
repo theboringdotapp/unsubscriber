@@ -1,0 +1,276 @@
+:root {
+  --primary-color: #4285f4;
+  --primary-dark: #3367d6;
+  --secondary-color: #818181;
+  --background-color: #f5f5f5;
+  --card-color: #ffffff;
+  --text-color: #333333;
+  --success-color: #34a853;
+  --error-color: #ea4335;
+  --border-color: #e0e0e0;
+  --shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", Arial,
+    sans-serif;
+  background-color: var(--background-color);
+  color: var(--text-color);
+  line-height: 1.6;
+}
+
+.container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+/* Header & Footer */
+header,
+footer {
+  text-align: center;
+  padding: 20px 0;
+}
+
+header h1 {
+  color: var(--primary-color);
+  margin-bottom: 10px;
+}
+
+footer {
+  font-size: 0.9rem;
+  color: var(--secondary-color);
+  margin-top: 30px;
+}
+
+/* Card styles */
+.card {
+  background-color: var(--card-color);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  padding: 30px;
+  margin-bottom: 20px;
+}
+
+.section {
+  margin-bottom: 30px;
+}
+
+.hidden {
+  display: none;
+}
+
+/* Button styles */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 20px;
+  border-radius: 4px;
+  border: none;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.1s;
+}
+
+.btn i {
+  margin-right: 8px;
+}
+
+.btn.primary {
+  background-color: var(--primary-color);
+  color: white;
+}
+
+.btn.primary:hover {
+  background-color: var(--primary-dark);
+}
+
+.btn.secondary {
+  background-color: var(--secondary-color);
+  color: white;
+}
+
+.btn.secondary:hover {
+  background-color: #6b6b6b;
+}
+
+.btn.small {
+  padding: 5px 10px;
+  font-size: 0.9rem;
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btn-container {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+  justify-content: flex-end;
+}
+
+.login-btn-container {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+/* Form elements */
+.form-group {
+  margin-bottom: 15px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: 500;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 1rem;
+}
+
+/* Results list */
+.results-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.email-list {
+  max-height: 400px;
+  overflow-y: auto;
+  margin-bottom: 20px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+}
+
+.email-item {
+  padding: 15px;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: flex-start;
+}
+
+.email-item:last-child {
+  border-bottom: none;
+}
+
+.email-item input[type="checkbox"] {
+  margin-right: 15px;
+  margin-top: 5px;
+}
+
+.email-content {
+  flex: 1;
+}
+
+.email-subject {
+  font-weight: 500;
+  margin-bottom: 5px;
+}
+
+.email-from,
+.email-date {
+  font-size: 0.9rem;
+  color: var(--secondary-color);
+  margin-bottom: 3px;
+}
+
+/* Progress bar */
+.progress-container {
+  margin: 20px 0;
+}
+
+.progress-bar {
+  height: 8px;
+  background-color: var(--border-color);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+.progress {
+  height: 100%;
+  background-color: var(--primary-color);
+  width: 0;
+  transition: width 0.3s;
+}
+
+#progress-text {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+/* Processing results */
+.process-result {
+  padding: 15px;
+  margin-bottom: 10px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+}
+
+.success {
+  background-color: rgba(52, 168, 83, 0.1);
+  color: var(--success-color);
+  border: 1px solid rgba(52, 168, 83, 0.3);
+}
+
+.error {
+  background-color: rgba(234, 67, 53, 0.1);
+  color: var(--error-color);
+  border: 1px solid rgba(234, 67, 53, 0.3);
+}
+
+.result-icon {
+  margin-right: 10px;
+}
+
+.process-result .email-subject {
+  margin-bottom: 5px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 600px) {
+  .container {
+    padding: 10px;
+  }
+
+  .card {
+    padding: 20px;
+  }
+
+  .results-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .selection-controls {
+    margin-top: 10px;
+  }
+
+  .btn-container {
+    flex-direction: column;
+  }
+
+  .btn {
+    width: 100%;
+  }
+}

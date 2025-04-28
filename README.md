@@ -1,58 +1,85 @@
-# Gmail Bulk Unsubscriber MVP
+# Gmail Bulk Unsubscriber - Serverless Edition
 
-A simple Flask application to scan your Gmail account, identify emails with unsubscribe links (primarily using the `List-Unsubscribe` header), and allow you to bulk unsubscribe and archive them.
+A serverless application to scan your Gmail account, identify emails with unsubscribe links, and allow you to bulk unsubscribe and archive them.
+
+## Architecture
+
+This application uses a provider-agnostic serverless architecture:
+
+- **Frontend**: Static HTML/JavaScript that handles UI and state management
+- **API functions**: Stateless serverless functions for authentication, scanning emails, and unsubscribing
+- **State management**: Tokens and state handled in browser storage
+
+## Project Structure
+
+```
+/
+├── api/                 # Serverless functions (Python)
+│   ├── auth.py          # Authentication endpoints
+│   ├── scan.py          # Email scanning functionality
+│   └── unsubscribe.py   # Unsubscribe functionality
+├── frontend/            # Client-side application
+│   ├── index.html       # Main page
+│   ├── js/              # JavaScript files
+│   └── css/             # Stylesheets
+└── README.md            # This documentation
+```
 
 ## Features
 
-*   Authenticates with your Google Account using OAuth 2.0.
-*   Scans recent emails (or those matching a basic query) for `List-Unsubscribe` headers.
-*   Displays a list of emails with potential unsubscribe links.
-*   Allows selection of emails to process.
-*   Attempts to visit the unsubscribe link (via HTTP GET).
-*   Archives the selected emails in Gmail.
+* Authenticates with your Google Account using OAuth 2.0.
+* Scans recent emails for `List-Unsubscribe` headers.
+* Displays a list of emails with potential unsubscribe links.
+* Allows selection of emails to process.
+* Attempts to visit the unsubscribe link (via HTTP GET).
+* Archives the selected emails in Gmail.
 
 ## Setup
 
-1.  **Google Cloud Project & Credentials:**
-    *   Go to the [Google Cloud Console](https://console.cloud.google.com/).
-    *   Create a new project (or use an existing one).
-    *   Enable the **Gmail API** for your project.
-    *   Go to "Credentials" -> "Create Credentials" -> "OAuth client ID".
-    *   Choose "Web application" as the application type.
-    *   Add `http://localhost:5000` under "Authorized JavaScript origins".
-    *   Add `http://localhost:5000/oauth2callback` under "Authorized redirect URIs".
-    *   Create the client ID. Download the JSON file and save it as `credentials.json` in the project's root directory.
-    *   **IMPORTANT:** You might need to add your Google account as a "Test User" in the OAuth consent screen settings while the app is in the "Testing" publishing status, otherwise, Google might block the login.
+1. **Google Cloud Project & Credentials:**
+   * Go to the [Google Cloud Console](https://console.cloud.google.com/).
+   * Create a new project (or use an existing one).
+   * Enable the **Gmail API** for your project.
+   * Go to "Credentials" -> "Create Credentials" -> "OAuth client ID".
+   * Choose "Web application" as the application type.
+   * Add your frontend URL (or `http://localhost:5000` for development) under "Authorized JavaScript origins".
+   * Add your redirect URL (or `http://localhost:5000/api/callback` for development) under "Authorized redirect URIs".
+   * Create the client ID. Download the JSON file and save it as `credentials.json`.
+   * You might need to add your Google account as a "Test User" in the OAuth consent screen settings.
 
-2.  **Python Environment & Dependencies:**
-    *   It's recommended to use a virtual environment:
-        ```bash
-        python3 -m venv venv
-        source venv/bin/activate  # On Windows use `venv\Scripts\activate`
-        ```
-    *   Install the required packages:
-        ```bash
-        pip install -r requirements.txt
-        ```
+2. **Provider-specific deployment:**
 
-## Running the Application
+   **Local Development:**
+   ```bash
+   # Install dependencies
+   pip install -r api/requirements.txt
+   
+   # Run API locally (using a tool like functions-framework)
+   functions-framework --target=auth_handler --source=api/auth.py --port=8080
+   
+   # Serve frontend (in another terminal)
+   cd frontend && python -m http.server 5000
+   ```
 
-1.  Make sure `credentials.json` is in the same directory as `app.py`.
-2.  Run the Flask development server:
-    ```bash
-    python app.py
-    ```
-3.  Open your web browser and navigate to `http://localhost:5000`.
-4.  Click "Login with Google" and follow the authentication flow. You will likely see a warning screen from Google because the app isn't verified; you'll need to proceed through the "advanced" options to allow access.
-5.  Once authenticated, click "Scan Emails for Unsubscribe Links".
-6.  Select the emails you want to unsubscribe from and click "Unsubscribe & Archive Selected".
+   **Vercel:**
+   - Deploy directly from the repository
+   - All `/api` functions are automatically deployed as serverless functions
+   - Frontend is automatically built and deployed
 
-## Limitations & Future Improvements (MVP)
+   **Netlify:**
+   - Add a `netlify.toml` file to configure functions directory
+   - Functions should be in the `netlify/functions` directory (can be symlinks)
 
-*   **Unsubscribe Method:** Only handles HTTP GET links found in `List-Unsubscribe` headers. Does not handle `mailto:` links or complex unsubscribe forms requiring POST requests or JavaScript.
-*   **Link Visiting:** Simply makes a GET request. Success isn't guaranteed, and some links might require browser interaction.
-*   **Email Parsing:** Does not currently parse the email body for unsubscribe links, only the headers.
-*   **Error Handling:** Basic error handling. Could be more robust.
-*   **Scalability:** Scans a limited number of recent emails. Not suitable for very large mailboxes without adjustments.
-*   **Security:** Stores OAuth tokens (`token.pickle`) locally. Suitable for personal use but not for a shared environment. `credentials.json` should also be kept secure.
-*   **UI:** Very basic user interface. 
+   **Firebase:**
+   - Use Firebase Hosting for the frontend
+   - Use Firebase Functions for the API (requires a `functions/` directory)
+
+   **AWS:**
+   - Use S3 + CloudFront for frontend
+   - Use API Gateway + Lambda for the API functions
+
+## Security Considerations
+
+- OAuth tokens are stored in browser storage
+- Consider implementing CSRF protection
+- Use environment variables for sensitive information 
