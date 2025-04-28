@@ -16,7 +16,7 @@
         border-radius: 0 var(--radius) var(--radius) 0; /* Apply border radius */
         background-color: hsl(var(--card)); /* Use card background */
         box-shadow: var(--shadow-sm); /* Add subtle shadow */
-        overflow: hidden; /* Needed for border radius */
+        /* overflow: hidden; */ /* Removed this to allow tooltip overflow */
     }
     
     .sender-header {
@@ -30,10 +30,11 @@
     }
     
     .sender-name-container {
-        cursor: pointer;
+        /* cursor: pointer; */ /* This was already here */
         display: flex;
         align-items: center;
         gap: 0.5rem;
+        cursor: pointer; /* Keep this one */
     }
     
     .collapse-button {
@@ -63,6 +64,7 @@
         transition: all 0.2s ease;
         font-weight: 500;
         color: hsl(var(--foreground)); /* Use foreground color */
+        cursor: pointer; /* Explicitly set cursor here */
     }
     
     .sender-selected .sender-name {
@@ -78,6 +80,7 @@
         align-items: center;
         border-bottom: 1px solid hsl(var(--border));
         transition: background-color 0.15s ease-in-out;
+        cursor: pointer; /* Added pointer cursor */
     }
 
     .email-row:last-child {
@@ -219,23 +222,22 @@
                          data-sender="{{ clean_sender }}"
                          style="--sender-color-hsl: {{ sender_color_hsl }};">
                         <div class="sender-header">
-                            <div class="sender-name-container" onclick="toggleSenderSelection('{{ sender_id }}')">
+                            <div class="sender-name-container" onclick='toggleSenderSelection({{ sender_id|tojson }})'>
                                 <input type="checkbox" 
                                        id="select-sender-{{ sender_id }}" 
                                        class="sender-checkbox form-checkbox h-4 w-4 text-brand border-border rounded focus:ring-brand" 
-                                       data-sender="{{ clean_sender }}"
-                                       onclick="event.stopPropagation(); selectAllSenderEmails(this, '{{ sender_id }}');">
-                                <label for="select-sender-{{ sender_id }}" class="sender-name ml-2">{{ clean_sender }} ({{ data.emails|length }})</label>
+                                       data-sender="{{ clean_sender|e }}">
+                                <label class="sender-name ml-2">{{ clean_sender }} ({{ data.emails|length }})</label>
                                 {% if data.unsubscribe_link %}
                                 <span class="tooltip-container">
                                     <a href="{{ data.unsubscribe_link }}" 
                                        target="_blank" 
                                        class="ml-2 text-xs text-brand hover:underline" 
                                        onclick="event.stopPropagation();">Link</a>
-                                    <span class="tooltip">
+                                <!--     <span class="tooltip">
                                         <span class="tooltip-icon">?</span>
                                         <span class="tooltip-text">Primary unsubscribe link found: {{ data.unsubscribe_link }}. Clicking 'Unsubscribe' below might use this or a mailto link from an individual email.</span>
-                                    </span>
+                                    </span> -->
                                 </span>
                                 {% endif %}
                             </div>
@@ -247,15 +249,15 @@
                         </div>
                         <div class="sender-emails" id="emails-{{ sender_id }}">
                             {% for email in data.emails %}
-                                <div class="email-row" id="email-{{ email.id }}" onclick="toggleEmailSelection('{{ email.id }}')">
+                                <div class="email-row" id="email-{{ email.id }}" onclick='toggleEmailSelection({{ email.id|tojson }})'>
                                     <div class="flex items-center flex-1 min-w-0 mr-4">
                                         <input type="checkbox" 
                                                name="email_ids" 
                                                value="{{ email.id }}" 
                                                class="email-checkbox form-checkbox h-4 w-4 text-brand border-border rounded focus:ring-brand mr-3" 
-                                               data-sender="{{ clean_sender }}"
+                                               data-sender="{{ clean_sender|e }}"
                                                onclick="event.stopPropagation(); handleEmailCheckboxClick(this);"></input>
-                                        <span class="email-subject text-sm text-foreground truncate" title="{{ email.subject }}">{{ email.subject }}</span>
+                                        <span class="email-subject text-sm text-foreground truncate" title="{{ email.subject|e }}">{{ email.subject }}</span>
                                     </div>
                                     <span class="text-xs text-muted-foreground flex-shrink-0">{{ email.date }}</span>
                                 </div>
@@ -366,8 +368,12 @@
 
     function toggleSenderSelection(senderId) {
         const senderCheckbox = document.getElementById(`select-sender-${senderId}`);
-        senderCheckbox.checked = !senderCheckbox.checked;
-        selectAllSenderEmails(senderCheckbox, senderId);
+        if (senderCheckbox) {
+            // Programmatically toggle the checkbox state
+            senderCheckbox.checked = !senderCheckbox.checked;
+            // Call the function that handles selecting children and updating storage
+            selectAllSenderEmails(senderCheckbox, senderId);
+        }
     }
 
     function selectAllSenderEmails(senderCheckbox, senderId) {
