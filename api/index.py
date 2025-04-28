@@ -10,6 +10,8 @@ import requests
 import json
 import sys
 import argparse
+from urllib.parse import urlparse, parse_qs
+from email.mime.text import MIMEText
 
 # Explicitly tell Flask the template folder is in the root directory
 # Calculate the path to the root directory relative to this file (api/index.py)
@@ -599,122 +601,179 @@ def scan_emails():
     return render_template('scan_results.html', emails=found_subscriptions, authenticated=authenticated, current_page_token=page_token, next_page_token=next_page_token)
 
 
+# --- Add a new helper function to render the modal content ---
+def render_unsubscribe_modal_content(success=True, message="", http_link=None):
+    """Renders an HTML snippet for the unsubscribe result modal."""
+    if success:
+        status_message = message or "Request processed successfully!"
+        link_message = ""
+        if http_link:
+             link_message = f'<p class="text-sm mt-2 text-[var(--text-secondary)]">You may need to <a href="{http_link}" target="_blank" class="text-[var(--accent-color)] hover:underline">visit the unsubscribe link</a> manually.</p>'
+
+        html = f"""
+        <div class="text-center p-6 flex flex-col items-center">
+            <div class="checkmark-container mb-4">
+                <svg class="checkmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52">
+                    <circle class="checkmark-circle" cx="26" cy="26" r="25" fill="none"/>
+                    <path class="checkmark-check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
+                </svg>
+            </div>
+            <h3 class="text-xl font-semibold text-gray-700 mb-2">Success!</h3>
+            <p class="text-gray-600">{status_message}</p>
+            {link_message}
+            <button class="mt-6 px-6 py-2 bg-[var(--accent-color)] text-white rounded-md hover:bg-[var(--accent-hover)]" onclick="window.removeProcessedEmails()">Done</button>
+        </div>
+        """
+    else:
+        status_message = message or "An error occurred."
+        html = f"""
+        <div class="bg-white rounded-lg p-6 text-center flex flex-col items-center">
+            <div class="error-container mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-red-500" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                </svg>
+            </div>
+            <h3 class="text-xl font-semibold text-red-600 mb-2">Error</h3>
+            <p class="text-gray-600">{status_message}</p>
+            <button class="mt-4 px-4 py-2 bg-[var(--accent-color)] text-white rounded-md hover:bg-[var(--accent-hover)]" onclick="window.closeErrorMessage()">Close</button>
+        </div>
+        """
+    return html
+
 @app.route('/unsubscribe', methods=['POST'])
 def unsubscribe_and_archive():
     """Handles the unsubscribe action from the form (visiting link/sending email)."""
     service = get_gmail_service()
     if not service:
-        flash("Authentication required.", "warning")
-        return redirect(url_for('login'))
+        if request.headers.get('HX-Request') == 'true':
+            return render_unsubscribe_modal_content(success=False, message="Authentication required. Please refresh and log in again."), 401
+        else:
+            flash("Authentication required.", "warning")
+            return redirect(url_for('login'))
 
-    link = request.form.get('link')
-    link_type = request.form.get('type')
-    message_id = request.form.get('message_id')
-    sender = request.form.get('sender') # Get sender for flashing message
+    is_ajax = request.headers.get('HX-Request') == 'true'
 
-    print(f"--- UNSUBSCRIBE ACTION ---")
-    print(f"Link: {link}, Type: {link_type}, Msg ID: {message_id}, Sender: {sender}")
+    final_ids_str = request.form.get('final_email_ids')
+    final_links_str = request.form.get('final_unsubscribe_links')
+    should_archive = request.form.get('should_archive') == 'true'
+
+    if not final_ids_str or not final_links_str:
+         if is_ajax:
+             return render_unsubscribe_modal_content(success=False, message="Missing email IDs or links in request."), 400
+         else:
+            flash("Missing information for unsubscribe action.", "error")
+            return redirect(url_for('scan_emails'))
+
+    # Split the combined strings
+    ids = final_ids_str.split(',')
+    # Links might need more robust splitting if they contain commas
+    links_raw = final_links_str.split(',,,,,') 
+
+    # --- Process the first email for now --- 
+    # TODO: Implement looping for multiple emails later
+    message_id = ids[0] if ids else None
+    
+    link_type = None
+    link = None
+    sender = "Selected Email" 
+    if message_id:
+         try:
+            full_message = service.users().messages().get(userId='me', id=message_id, format='metadata', metadataHeaders=['List-Unsubscribe', 'From']).execute()
+            link, link_type = find_unsubscribe_links(full_message)
+            headers = full_message.get('payload', {}).get('headers', [])
+            sender_raw = next((h['value'] for h in headers if h['name'].lower() == 'from'), sender)
+            if '<' in sender_raw and '>' in sender_raw:
+                sender = sender_raw[:sender_raw.find('<')].strip().replace('"', '') or sender_raw
+            else:
+                sender = sender_raw
+         except Exception as fetch_err:
+             print(f"Error fetching message {message_id} details in unsubscribe: {fetch_err}")
+             if is_ajax:
+                 return render_unsubscribe_modal_content(success=False, message=f"Could not retrieve details for message {message_id}."), 500
+             else:
+                flash(f"Could not retrieve details for message {message_id}.", "error")
+                return redirect(url_for('scan_emails'))
 
     if not link or not link_type or not message_id:
-        flash("Missing information for unsubscribe action.", "error")
-        return redirect(url_for('scan_emails')) # Redirect back to scan? Or maybe index?
+         if is_ajax:
+             return render_unsubscribe_modal_content(success=False, message="Missing link, type, or message ID after re-fetching."), 400
+         else:
+            flash("Missing information for unsubscribe action after re-fetching.", "error")
+            return redirect(url_for('scan_emails'))
+
+    print(f"--- UNSUBSCRIBE ACTION (Processing ID: {message_id}) --- PENDING MULTI-ITEM IMPL")
+    print(f"Link: {link}, Type: {link_type}, Archive: {should_archive}, Sender: {sender}")
 
     success = False
     error_message = None
+    http_link_for_modal = None
 
     try:
         if link_type == 'header_http':
-            # For HTTP links, we redirect the user's browser to the link.
-            # We cannot programmatically visit it reliably/securely server-side.
-            # We will archive the email *after* redirecting.
-            print(f"Redirecting user to HTTP unsubscribe link: {link}")
-            # Archive the specific message ID
-            try:
-                print(f"Archiving message ID: {message_id} after initiating unsubscribe")
-                service.users().messages().modify(
-                    userId='me',
-                    id=message_id,
-                    body={'removeLabelIds': ['INBOX']} # Archiving = removing INBOX label
-                ).execute()
+            http_link_for_modal = link
+            print(f"Processing HTTP link for {sender}. Archiving: {should_archive}")
+            if should_archive:
+                print(f"Archiving message ID: {message_id}")
+                service.users().messages().modify(userId='me', id=message_id, body={'removeLabelIds': ['INBOX']}).execute()
                 print(f"Archived message {message_id}")
-                # Flash message might be lost on redirect, maybe add param?
-                # Or use session to store success message for next page load
-                session['unsubscribe_success'] = f"Redirecting to unsubscribe page for {sender}... Email archived."
-
-            except Exception as archive_err:
-                 print(f"Error archiving message {message_id}: {archive_err}")
-                 # Don't stop the redirect, but maybe log this
-                 session['unsubscribe_error'] = f"Redirecting to unsubscribe page for {sender}. Could not archive email: {archive_err}"
-
-
-            return redirect(link) # Perform the redirect
+            else:
+                print(f"Skipping archive for {message_id}")
+            success = True 
 
         elif link_type == 'header_mailto':
-            # Handle mailto links - requires parsing and sending an email
-            # Example: mailto:unsubscribe@example.com?subject=removeme&body=extra_info
-            print(f"Processing mailto link: {link}")
-            from urllib.parse import urlparse, parse_qs
-
+            print(f"Processing mailto link for {sender}. Archiving: {should_archive}")
             parsed_mailto = urlparse(link)
             to_address = parsed_mailto.path
             params = parse_qs(parsed_mailto.query)
-            subject = params.get('subject', ['Unsubscribe'])[0] # Default subject
-            body = params.get('body', ['Please unsubscribe me.'])[0] # Default body
-
-            if not to_address:
-                 raise ValueError("Mailto link missing recipient address.")
+            subject = params.get('subject', ['Unsubscribe'])[0]
+            body = params.get('body', ['Please unsubscribe me.'])[0]
+            if not to_address: raise ValueError("Mailto link missing recipient address.")
 
             print(f"Sending unsubscribe email to: {to_address}, Subject: {subject}")
-
-            # Create the email message
-            from email.mime.text import MIMEText
             message = MIMEText(body)
             message['to'] = to_address
             message['subject'] = subject
-            # Get user's email address to set 'from' - requires profile scope (or use 'me')
-            # profile = service.users().getProfile(userId='me').execute()
-            # message['from'] = profile['emailAddress']
-            # For simplicity, let Gmail API handle 'from' when sending as 'me'
-
             raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
             send_message_body = {'raw': raw_message}
 
-            # Send the email
             if MOCK_API:
-                print("--- MOCK SEND EMAIL ---")
-                print(f"To: {to_address}, Subject: {subject}, Body: {body}")
-                sent_message = {'id': f'mock_sent_{message_id}', 'labelIds': ['SENT']}
+                 print("--- MOCK SEND EMAIL ---")
+                 sent_message = {'id': f'mock_sent_{message_id}', 'labelIds': ['SENT']}
             else:
-                sent_message = service.users().messages().send(
-                    userId='me',
-                    body=send_message_body
-                ).execute()
+                sent_message = service.users().messages().send(userId='me', body=send_message_body).execute()
             print(f"Sent unsubscribe email. Result: {sent_message}")
 
-            # Archive the original message
-            print(f"Archiving message ID: {message_id}")
-            service.users().messages().modify(
-                userId='me',
-                id=message_id,
-                body={'removeLabelIds': ['INBOX']}
-            ).execute()
-            print(f"Archived message {message_id}")
+            if should_archive:
+                print(f"Archiving message ID: {message_id}")
+                service.users().messages().modify(userId='me', id=message_id, body={'removeLabelIds': ['INBOX']}).execute()
+                print(f"Archived message {message_id}")
+            else:
+                 print(f"Skipping archive for {message_id}")
             success = True
-
 
     except Exception as e:
         error_message = f"Error processing unsubscribe for {sender}: {e}"
         print(f"!!! ERROR during unsubscribe action: {error_message} !!!")
-        flash(error_message, "error")
+        if not is_ajax:
+            flash(error_message, "error")
 
-    if success:
-        flash(f"Unsubscribe email sent successfully for {sender}! Original email archived.", "success")
-    # No redirect here for mailto, stay on results page (or maybe back to index?)
-    # Need to re-run scan to refresh the list shown
-    # TODO: Improve UX - maybe remove the item client-side? Or just rely on flash message?
-    # Re-rendering scan results might be confusing if it takes time
-    # Redirecting to index might be simplest
-    return redirect(url_for('index')) # Redirect to index after mailto action
+    if is_ajax:
+        if success:
+            archive_msg = " Email archived." if should_archive else " Email kept in inbox."
+            modal_msg = f"Unsubscribe request sent for {sender}.{archive_msg}"
+            if link_type == 'header_http':
+                 modal_msg = f"Processed archive request for {sender}.{archive_msg}"
+            return render_unsubscribe_modal_content(success=True, message=modal_msg, http_link=http_link_for_modal)
+        else:
+            return render_unsubscribe_modal_content(success=False, message=error_message or "An unknown error occurred.")
+    else:
+        if success:
+             if link_type == 'header_http':
+                 session['unsubscribe_success'] = f"Redirecting to unsubscribe page for {sender}... Email { 'archived' if should_archive else 'kept'}."
+                 return redirect(link) 
+             else:
+                 flash(f"Unsubscribe email sent successfully for {sender}! Original email { 'archived' if should_archive else 'kept'}.", "success")
+        return redirect(url_for('index'))
 
 
 # --- Main Execution (for local development) ---

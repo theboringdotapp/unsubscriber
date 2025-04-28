@@ -676,145 +676,145 @@
     // Form submission handler - Now with AJAX
     function handleUnsubscribeSubmit(event) {
         event.preventDefault(); // Prevent normal form submission
-        
+
         const selectedEmails = getSelectedEmails();
         const ids = Object.keys(selectedEmails);
-        const links = Object.values(selectedEmails);
+
         const shouldArchive = document.getElementById('archive-checkbox').checked;
 
+        // Update hidden form fields
         document.getElementById('final-email-ids').value = ids.join(',');
-        document.getElementById('final-unsubscribe-links').value = links.join(',,,,,'); // Use five commas as delimiter to avoid URL conflicts
+        document.getElementById('final-unsubscribe-links').value = ids.map(id => selectedEmails[id]).join(',,,,,'); // Still just links
         document.getElementById('should-archive-input').value = shouldArchive;
 
         if (ids.length === 0) {
             alert("Please select at least one email to unsubscribe.");
             return false;
         }
-        
-        // Store processed IDs for later removal
+
+        // Store processed IDs for later removal *after* success
+        processedEmailIds.clear();
         ids.forEach(id => processedEmailIds.add(id));
-        
-        // Show loading state
+
+        // Show loading state on button
         setLoading('unsubscribe-button', 'Unsubscribing...');
-        
-        // Show the modal immediately with a loading state
+
+        // Show the modal immediately with a generic loading state
         if (resultModal) {
             document.getElementById('unsubscribe-results').innerHTML = `
-                <div class="text-center">
+                <div class="text-center p-6">
                     <div class="inline-block rounded-full border-4 border-t-transparent border-[var(--accent-color)] border-solid h-12 w-12 animate-spin mb-4"></div>
                     <p class="text-gray-600">Processing your request...</p>
                 </div>
             `;
             resultModal.classList.remove('modal-hidden');
         }
-        
+
         // Submit the form with AJAX
         const form = document.getElementById('unsubscribe-form');
         const formData = new FormData(form);
-        
-        // Add a header to indicate this is an AJAX/HTMX request
+
         fetch(form.action, {
             method: 'POST',
             body: formData,
             headers: {
-                'HX-Request': 'true' // This tells the server it's an HTMX request
+                'HX-Request': 'true',
+                'Accept': 'text/html'
             }
         })
-        .then(response => response.text())
-        .then(html => {
-            // Show the result modal with the response HTML
+        .then(response => {
+             if (!response.ok) {
+                  return response.text().then(errorHtml => {
+                       throw new Error(errorHtml || `Request failed with status ${response.status}`);
+                  });
+             }
+             return response.text();
+         })
+        .then(html => { // html contains the success snippet
             if (resultModal) {
                 document.getElementById('unsubscribe-results').innerHTML = html;
             }
-            
-            // Reset loading state
-            if (unsubscribeButton) {
-                hideLoading('unsubscribe-button');
-            }
+             if (unsubscribeButton) {
+                 hideLoading('unsubscribe-button');
+             }
         })
-        .catch(error => {
+        .catch(error => { 
             console.error('Error:', error);
-            
-            // Show error in the modal
+             if (unsubscribeButton) {
+                 hideLoading('unsubscribe-button');
+             }
             if (resultModal) {
-                document.getElementById('unsubscribe-results').innerHTML = `
-                    <div class="bg-white rounded-lg p-6 text-center flex flex-col items-center">
-                        <div class="error-container mb-4">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-red-500" viewBox="0 0 20 20" fill="currentColor">
-                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
-                            </svg>
-                        </div>
-                        <h3 class="text-xl font-semibold text-red-600 mb-2">Error</h3>
-                        <p class="text-gray-600">An error occurred while processing your request.</p>
-                        <button class="mt-4 px-4 py-2 bg-[var(--accent-color)] text-white rounded-md hover:bg-[var(--accent-hover)]" onclick="window.closeErrorMessage()">Close</button>
-                    </div>
-                `;
+                document.getElementById('unsubscribe-results').innerHTML = (typeof error.message === 'string' && error.message.includes('<'))
+                    ? error.message
+                    : render_unsubscribe_modal_content_js(false, "A network or unexpected error occurred."); // Use JS fallback renderer
             }
-            
-            // Reset loading state
-            if (unsubscribeButton) {
-                hideLoading('unsubscribe-button');
-            }
+             processedEmailIds.clear();
         });
     }
-    
-    // Function to remove processed emails from list
+
+     // --- JS version of the error modal renderer for fallback ---
+     function render_unsubscribe_modal_content_js(success=false, message="") {
+         if (!success) {
+             const status_message = message || "An unexpected error occurred.";
+             return `
+             <div class="bg-white rounded-lg p-6 text-center flex flex-col items-center">
+                 <div class="error-container mb-4">
+                     <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-red-500" viewBox="0 0 20 20" fill="currentColor">
+                         <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                     </svg>
+                 </div>
+                 <h3 class="text-xl font-semibold text-red-600 mb-2">Error</h3>
+                 <p class="text-gray-600">${status_message}</p>
+                 <button class="mt-4 px-4 py-2 bg-[var(--accent-color)] text-white rounded-md hover:bg-[var(--accent-hover)]" onclick="window.closeErrorMessage()">Close</button>
+             </div>
+             `;
+         }
+         return "";
+     }
+
+    // Function to remove processed emails from list (Called by 'Done' button in success modal)
     function removeProcessedEmails() {
         console.log("removeProcessedEmails called");
-        if (processedEmailIds.size === 0) {
-            // No emails to remove
-            if (resultModal) {
-                resultModal.classList.add('modal-hidden');
-            }
-            return;
-        }
-        
-        // Remove rows for processed emails
-        processedEmailIds.forEach(emailId => {
-            const row = document.querySelector(`tr[data-id="${emailId}"]`);
-            if (row) {
-                // Add animation class
-                row.classList.add('fade-out');
-                // Remove from the DOM after animation completes
-                setTimeout(() => {
-                    row.remove();
-                    
-                    // Check if sender group is now empty
-                    const senderGroup = row.closest('.sender-group');
-                    if (senderGroup && senderGroup.querySelectorAll('tr.clickable-row').length === 0) {
-                        senderGroup.classList.add('fade-out');
-                        setTimeout(() => {
-                            senderGroup.remove();
-                        }, 500);
-                    }
-                }, 500);
-                
-                // Also remove from storage
-                const selectedEmails = getSelectedEmails();
-                delete selectedEmails[emailId];
-                saveSelectedEmails(selectedEmails);
-            }
-        });
-        
-        // Clear processed IDs
-        processedEmailIds.clear();
-        
-        // Update button state
-        updateFixedFooter();
-        updateSenderCheckboxes();
-        
-        // Hide modal
-        if (resultModal) {
+        if (resultModal) { 
             resultModal.classList.add('modal-hidden');
         }
+        if (processedEmailIds.size === 0) {
+            console.log("No processed IDs to remove.");
+            return; 
+        }
+
+        processedEmailIds.forEach(emailId => {
+             document.querySelectorAll(`tr[data-id="${emailId}"]`).forEach(row => {
+                 const senderGroup = row.closest('.sender-group');
+                 row.classList.add('fade-out');
+                 setTimeout(() => {
+                     row.remove();
+                     if (senderGroup && senderGroup.querySelectorAll('tbody tr').length === 0) {
+                         senderGroup.classList.add('fade-out');
+                         setTimeout(() => {
+                             senderGroup.remove();
+                             if (document.querySelectorAll('#email-list-body .sender-group').length === 0) {
+                                 document.getElementById('email-list-body').innerHTML = '<p class="p-6 text-[var(--text-secondary)]">All selected items processed.</p>';
+                                 updateFixedFooter(); 
+                             }
+                         }, 500); 
+                     }
+                 }, 500); 
+             });
+         });
+
+        processedEmailIds.clear();
+        updateFixedFooter();
+        saveSelectedEmails({}); 
     }
-    
-    // Function to close error message
+
+     // Function to close error message (called by 'Close' button in error modal)
     function closeErrorMessage() {
         console.log("closeErrorMessage called");
         if (resultModal) {
             resultModal.classList.add('modal-hidden');
         }
+         processedEmailIds.clear();
     }
 
     // --- Initial Load ---
