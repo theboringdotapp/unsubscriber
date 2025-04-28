@@ -531,19 +531,21 @@ def scan_emails():
                     else:
                         clean_sender = sender # Use as is if no brackets
 
-                    # Add to dict, keyed by clean sender, storing details
-                    if clean_sender not in found_subscriptions:
-                         found_subscriptions[clean_sender] = {
-                             "link": unsubscribe_link,
-                             "type": link_type, # 'header_http' or 'header_mailto'
-                             "full_sender": sender,
-                             "subject": subject,
-                             "message_id": msg_id # Store one example message ID
-                         }
-                         print(f"Added subscription: {clean_sender} -> {unsubscribe_link}") # DEBUG
-                    else:
-                         print(f"Skipping duplicate sender: {clean_sender}") # DEBUG
+                    # Store details for each email, grouped by sender
+                    email_data = {
+                         "link": unsubscribe_link,
+                         "type": link_type,
+                         "full_sender": sender, # Store original sender string for potential display
+                         "subject": subject,
+                         "message_id": msg_id # Need the ID for actions
+                    }
 
+                    if clean_sender not in found_subscriptions:
+                        found_subscriptions[clean_sender] = [email_data] # Initialize list for new sender
+                        print(f"Added first email for sender: {clean_sender} -> Subject: {subject}") # DEBUG
+                    else:
+                        found_subscriptions[clean_sender].append(email_data) # Append to existing list
+                        print(f"Added another email for sender: {clean_sender} -> Subject: {subject}") # DEBUG
 
                 processed_count += 1
 

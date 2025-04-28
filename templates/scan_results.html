@@ -233,13 +233,14 @@
 
                 <div class="px-6">
                     <div id="email-list-body">
-                        {% for sender, email_details in emails.items() %}
+                        {% for sender, sender_emails_list in emails.items() %}
                             <div class="sender-group" data-sender="{{ sender | escape }}">
                                 <div class="sender-header">
                                     <div class="flex items-center sender-name-container" onclick="handleSenderNameClick(event, this)">
                                         <input type="checkbox" onclick="event.stopPropagation(); handleSenderCheckboxClick(this, '{{ sender | escape }}')" class="form-checkbox h-4 w-4 rounded text-[var(--accent-color)] focus:ring-[var(--accent-color)] sender-checkbox mr-3">
                                         <div>
                                             <span class="font-medium sender-name">{{ sender }}</span>
+                                            <span class="ml-2 text-xs text-[var(--text-secondary)]">({{ sender_emails_list|length }} email{{ 's' if sender_emails_list|length > 1 else '' }})</span>
                                         </div>
                                     </div>
                                     <div class="collapse-button" onclick="toggleSenderGroup(this)">
@@ -265,17 +266,19 @@
                                                 </tr>
                                             </thead>
                                             <tbody class="divide-y divide-[var(--border-color)]">
-                                                <tr data-sender="{{ sender | escape }}" data-id="{{ email_details.message_id }}" data-link="{{ email_details.link }}" class="hover:bg-[var(--hover-bg)] clickable-row">
+                                                {% for email in sender_emails_list %}
+                                                <tr data-sender="{{ sender | escape }}" data-id="{{ email.message_id }}" data-link="{{ email.link }}" class="hover:bg-[var(--hover-bg)] clickable-row">
                                                     <td class="px-6 py-4 whitespace-nowrap w-16">
-                                                        <input type="checkbox" name="email_ids_page" value="{{ email_details.message_id }}" onclick="handleSingleCheckboxClick(this)" class="form-checkbox h-4 w-4 rounded text-[var(--accent-color)] focus:ring-[var(--accent-color)] item-checkbox">
+                                                        <input type="checkbox" name="email_ids_page" value="{{ email.message_id }}" onclick="handleSingleCheckboxClick(this)" class="form-checkbox h-4 w-4 rounded text-[var(--accent-color)] focus:ring-[var(--accent-color)] item-checkbox">
                                                     </td>
-                                                    <td class="px-6 py-4 text-sm text-[var(--text-primary)] truncate" title="{{ email_details.subject }}">
-                                                        {{ email_details.subject }}
+                                                    <td class="px-6 py-4 text-sm text-[var(--text-primary)] truncate" title="{{ email.subject }}">
+                                                        {{ email.subject }}
                                                     </td>
                                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-secondary)] w-32">
-                                                        <a href="{{ email_details.link }}" target="_blank" class="text-[var(--accent-color)] hover:text-[var(--accent-hover)] hover:underline text-xs email-link" title="{{ email_details.link }}">Visit Link</a>
+                                                        <a href="{{ email.link }}" target="_blank" class="text-[var(--accent-color)] hover:text-[var(--accent-hover)] hover:underline text-xs email-link" title="{{ email.link }}">Visit Link</a>
                                                     </td>
                                                 </tr>
+                                                {% endfor %}
                                             </tbody>
                                         </table>
                                     </div>
