@@ -1,5 +1,8 @@
+# token.pickle # Keep this ignored
 credentials.json
 
 .cursor/
 .specstory/
-token.pickle
+
+# Vercel build output
+.vercel/
