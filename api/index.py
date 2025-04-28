@@ -359,6 +359,12 @@ def login():
          flash("Could not load credentials configuration. Please check server logs.", "error")
          return redirect(url_for('index'))
 
+    # --- Debugging Redirect URI ---
+    print(f"[Login Route] Using Flow object: {flow}")
+    print(f"[Login Route] Redirect URI from flow object: {flow.redirect_uri}")
+    print(f"[Login Route] Redirect URI constructed earlier: {REDIRECT_URI}")
+    # --- End Debugging ---
+
     try:
         authorization_url, state = flow.authorization_url(
             access_type='offline',  # Request refresh token
