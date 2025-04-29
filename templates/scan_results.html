@@ -397,6 +397,8 @@
     const MAX_EMAILS = 25; // Maximum number of emails that can be selected/processed at once
 
     // --- Storage Helper Functions ---
+    const detailsStorageKey = 'emailDetails'; // Key for storing detailed email information
+    
     function getSelectedEmailsFromStorage() {
         const stored = sessionStorage.getItem(storageKey);
         try {
@@ -415,6 +417,24 @@
             console.error("Error saving selectedEmails to sessionStorage:", e);
         }
     }
+    
+    function getEmailDetailsFromStorage() {
+        const stored = sessionStorage.getItem(detailsStorageKey);
+        try {
+            return stored ? JSON.parse(stored) : {};
+        } catch (e) {
+            console.error("Error parsing emailDetails from sessionStorage:", e);
+            return {};
+        }
+    }
+    
+    function saveEmailDetailsToStorage(emailDetailsObj) {
+        try {
+            sessionStorage.setItem(detailsStorageKey, JSON.stringify(emailDetailsObj));
+        } catch (e) {
+            console.error("Error saving emailDetails to sessionStorage:", e);
+        }
+    }
 
     // Update storage based on checkbox state
     function updateStorageForItem(emailId, isSelected) {
@@ -422,9 +442,52 @@
         if (isSelected) {
             if (!selectedIds.includes(emailId)) {
                 selectedIds.push(emailId);
+                
+                // Also store detailed information for this email if available
+                const emailRow = document.getElementById(`email-${emailId}`);
+                if (emailRow) {
+                    const checkbox = emailRow.querySelector('.email-checkbox');
+                    if (checkbox) {
+                        const sender = checkbox.getAttribute('data-sender');
+                        
+                        // Get the sender group element to find unsubscribe link
+                        let unsubscribeLink = null;
+                        if (sender) {
+                            const senderId = sender.replace(/\s+/g, '-')
+                                .replace(/[<>]/g, '')
+                                .replace(/@/g, '-')
+                                .replace(/\./g, '-');
+                            
+                            const senderGroup = document.getElementById(`sender-group-${senderId}`);
+                            if (senderGroup) {
+                                const headerLinks = senderGroup.querySelectorAll('.sender-header a');
+                                if (headerLinks.length > 0) {
+                                    unsubscribeLink = headerLinks[0].getAttribute('href') || null;
+                                }
+                            }
+                        }
+                        
+                        // Store the email details
+                        const emailDetails = getEmailDetailsFromStorage();
+                        emailDetails[emailId] = {
+                            id: emailId,
+                            sender: sender || null,
+                            link: unsubscribeLink,
+                            type: unsubscribeLink ? (unsubscribeLink.startsWith('mailto:') ? 'mailto' : 'http') : null
+                        };
+                        saveEmailDetailsToStorage(emailDetails);
+                    }
+                }
             }
         } else {
             selectedIds = selectedIds.filter(id => id !== emailId);
+            
+            // Remove this email from the details storage as well
+            const emailDetails = getEmailDetailsFromStorage();
+            if (emailDetails[emailId]) {
+                delete emailDetails[emailId];
+                saveEmailDetailsToStorage(emailDetails);
+            }
         }
         saveSelectedEmailsToStorage(selectedIds);
     }
@@ -722,47 +785,80 @@
         const emailsWithNoLinks = [];
         const allEmailDetails = [];
         
+        // Get stored email details for all selected emails
+        const storedEmailDetails = getEmailDetailsFromStorage();
+        
         // First analyze all selected emails to categorize them
         for (const emailId of selectedIdsFromStorage) {
-            const checkbox = document.querySelector(`.email-checkbox[value="${emailId}"]`);
-            if (!checkbox) {
-                console.warn(`Checkbox not found for email ID: ${emailId}`);
-                continue;
-            }
-            
-            const sender = checkbox.getAttribute('data-sender');
-            const emailRow = document.getElementById(`email-${emailId}`);
-            
-            if (!sender || !emailRow) {
-                console.warn(`Missing sender or row for email ID: ${emailId}`);
-                continue;
-            }
-            
-            // Extract unsubscribe link if available
+            let sender = null;
             let unsubscribeLink = null;
+            let emailRow = null;
             
-            // Try to find the link in different ways
-            // First check for direct links from email row
-            const linkElements = emailRow.querySelectorAll('a.unsubscribe-link, a.email-link');
-            if (linkElements.length > 0) {
-                unsubscribeLink = linkElements[0].getAttribute('href');
+            // First check if we have the details stored in sessionStorage
+            if (storedEmailDetails[emailId]) {
+                const details = storedEmailDetails[emailId];
+                sender = details.sender;
+                unsubscribeLink = details.link;
+                
+                console.log(`Using stored details for email ${emailId}: sender=${sender}, link=${unsubscribeLink}`);
+            } else {
+                // Fallback to checking the DOM if the email is on the current page
+                const checkbox = document.querySelector(`.email-checkbox[value="${emailId}"]`);
+                
+                if (checkbox) {
+                    // Email is on current page
+                    sender = checkbox.getAttribute('data-sender');
+                    emailRow = document.getElementById(`email-${emailId}`);
+                    
+                    // Extract unsubscribe link if available
+                    // Try to find the link in different ways
+                    // First check for direct links from email row
+                    if (emailRow) {
+                        const linkElements = emailRow.querySelectorAll('a.unsubscribe-link, a.email-link');
+                        if (linkElements.length > 0) {
+                            unsubscribeLink = linkElements[0].getAttribute('href');
+                        }
+                    }
+                    
+                    // If no link found in email row, try to find sender's primary unsubscribe link
+                    if (!unsubscribeLink && sender) {
+                        // Find the sender group element
+                        const senderId = sender.replace(/\s+/g, '-')
+                            .replace(/[<>]/g, '')
+                            .replace(/@/g, '-')
+                            .replace(/\./g, '-');
+                        
+                        const senderGroup = document.getElementById(`sender-group-${senderId}`);
+                        if (senderGroup) {
+                            const headerLinks = senderGroup.querySelectorAll('.sender-header a');
+                            if (headerLinks.length > 0) {
+                                unsubscribeLink = headerLinks[0].getAttribute('href');
+                            }
+                        }
+                    }
+                    
+                    // Save this info to storage for future use
+                    if (sender) {
+                        storedEmailDetails[emailId] = {
+                            id: emailId,
+                            sender: sender,
+                            link: unsubscribeLink,
+                            type: unsubscribeLink ? (unsubscribeLink.startsWith('mailto:') ? 'mailto' : 'http') : null
+                        };
+                        saveEmailDetailsToStorage(storedEmailDetails);
+                    }
+                } else {
+                    // Email is not on current page and we don't have stored details
+                    console.log(`Email ID ${emailId} not found on current page and no stored details, will be processed by backend`);
+                    emailsWithNoLinks.push(emailId);
+                    continue;
+                }
             }
             
-            // If no link found in email row, try to find sender's primary unsubscribe link
-            if (!unsubscribeLink) {
-                // Find the sender group element
-                const senderId = sender.replace(/\s+/g, '-')
-                    .replace(/[<>]/g, '')
-                    .replace(/@/g, '-')
-                    .replace(/\./g, '-');
-                
-                const senderGroup = document.getElementById(`sender-group-${senderId}`);
-                if (senderGroup) {
-                    const headerLinks = senderGroup.querySelectorAll('.sender-header a');
-                    if (headerLinks.length > 0) {
-                        unsubscribeLink = headerLinks[0].getAttribute('href');
-                    }
-                }
+            if (!sender) {
+                console.warn(`Missing sender for email ID: ${emailId}`);
+                emailsWithNoLinks.push(emailId);
+                continue;
             }
             
             // Store email details
@@ -790,6 +886,8 @@
         window.totalSendersToProcess = senders.length;
         window.currentSenderIndex = 0;
         
+        // To handle emails not on the current page, we'll send all IDs to the backend
+        // that aren't being processed on the client side
         const shouldArchive = document.getElementById('archive-toggle').checked;
         const buttonId = 'unsubscribe-button';
         
@@ -801,7 +899,7 @@
         const mailtoSenders = Object.keys(mailtoLinks);
         
         console.log(`Processing client-side: ${httpSenders.length} HTTP links, ${mailtoSenders.length} mailto links`);
-        console.log(`${emailsWithNoLinks.length} emails have no direct unsubscribe links`);
+        console.log(`${emailsWithNoLinks.length} emails have no direct unsubscribe links or are from other pages`);
         
         const successfullyProcessedIds = [];
         const manuallyRequiredIds = [];  // Track IDs requiring manual action
@@ -903,12 +1001,21 @@
         // Wait for all HTTP link processing to complete
         await Promise.all(httpPromises);
         console.log(`Completed processing ${httpSenders.length} HTTP links`);
-        console.log(`Completed processing ${httpSenders.length} HTTP links`);
         
         // Process mailto links and any remaining emails through the backend
         const emailsForBackend = [...emailsWithNoLinks];
         mailtoSenders.forEach(sender => {
             emailsForBackend.push(...(senderMap[sender] || []));
+        });
+        
+        // Add any emails from session storage that weren't found on this page
+        const emailIdsOnCurrentPage = Array.from(document.querySelectorAll('.email-checkbox')).map(cb => cb.value);
+        const emailIdsNotOnPage = selectedIdsFromStorage.filter(id => !emailIdsOnCurrentPage.includes(id));
+        emailIdsNotOnPage.forEach(id => {
+            if (!emailsForBackend.includes(id)) {
+                console.log(`Adding email ID ${id} from another page to backend processing`);
+                emailsForBackend.push(id);
+            }
         });
         
         if (emailsForBackend.length > 0) {
@@ -970,12 +1077,21 @@
             }
         }
         
+        // Ensure all selected emails from storage are included in the processing
+        selectedIdsFromStorage.forEach(id => {
+            if (!successfullyProcessedIds.includes(id) && !manuallyRequiredIds.includes(id) && !failedIds.includes(id)) {
+                // This email wasn't explicitly tracked anywhere, so consider it processed by backend
+                successfullyProcessedIds.push(id);
+            }
+        });
+        
         // Perform batch archive if needed
-        if (shouldArchive && successfullyProcessedIds.length > 0) {
-            console.log(`Batch archiving ${successfullyProcessedIds.length} emails`);
+        if (shouldArchive && selectedIdsFromStorage.length > 0) {
+            console.log(`Batch archiving ${selectedIdsFromStorage.length} emails`);
             
             const formData = new FormData();
-            successfullyProcessedIds.forEach(id => formData.append('email_ids', id));
+            // Always use ALL emails from session storage for archiving
+            selectedIdsFromStorage.forEach(id => formData.append('email_ids', id));
             
             try {
                 const response = await fetch("{{ url_for('scan.archive_emails') }}", {
@@ -1002,8 +1118,8 @@
         }
         
         // Final update to UI
-        // Consider both automatic and manual actions as "processed" for UI purposes
-        window.processedEmailIds = [...successfullyProcessedIds, ...manuallyRequiredIds];
+        // Consider all selected emails as "processed" for UI and cleanup purposes
+        window.processedEmailIds = [...selectedIdsFromStorage];
         
         // Construct final message
         const successCount = successfullyProcessedIds.length;
@@ -1026,9 +1142,9 @@
             message += `${failCount} email${failCount !== 1 ? 's' : ''} failed.`;
         }
         
-        if (shouldArchive && (successCount > 0 || manualCount > 0)) {
+        if (shouldArchive) {
             if (message) message += ' ';
-            const archivedCount = successCount + manualCount;
+            const archivedCount = selectedIdsFromStorage.length;
             message += `Archived ${archivedCount} email${archivedCount !== 1 ? 's' : ''}.`;
         }
         
@@ -1053,12 +1169,7 @@
             message: message.trim(),
             details: {
                 unsubscribe_errors: errors,
-                processed_senders: senders.filter(sender => {
-                    // Include senders where at least one email was processed
-                    return senderMap[sender].some(id => 
-                        successfullyProcessedIds.includes(id) || manuallyRequiredIds.includes(id)
-                    );
-                }),
+                processed_senders: senders,
                 processed_email_ids: window.processedEmailIds,
                 manual_links: manualLinks,
                 manual_count: manualCount
@@ -1071,9 +1182,8 @@
         showModal(renderSuccessModalContent(resultData.message, resultData.http_link, resultData));
         
         // Clear storage on successful processing
-        if (successCount > 0) {
-            saveSelectedEmailsToStorage([]);
-        }
+        saveSelectedEmailsToStorage([]);
+        saveEmailDetailsToStorage({});
         
         hideLoading(buttonId);
     }
@@ -1309,7 +1419,8 @@
             if (response.ok && resultData.success) {
                 showModal(renderSuccessModalContent(resultData.message));
                 // Clear storage ONLY on successful processing of ALL items
-                saveSelectedEmailsToStorage([]); 
+                saveSelectedEmailsToStorage([]);
+                saveEmailDetailsToStorage({});
             } else {
                  const errorMessage = resultData.error || `Request failed with status ${response.status}`;
                  showModal(renderErrorModalContent(errorMessage));
@@ -1588,6 +1699,7 @@
         console.log("Resetting selection...");
         // Clear storage
         saveSelectedEmailsToStorage([]);
+        saveEmailDetailsToStorage({}); // Also clear email details storage
         
         // Uncheck all visible checkboxes
         document.querySelectorAll('.email-checkbox:checked').forEach(cb => {
