@@ -1,4 +1,5 @@
 import os
+import re
 import base64
 import email
 from urllib.parse import urlparse, parse_qs
@@ -60,44 +61,104 @@ def _get_mock_message_details(msg_id):
 # --- Helper Functions --- 
 
 def find_unsubscribe_links(message_data):
-    """Parses email headers for unsubscribe links."""
-    # ... (implementation as before) ...
+    """Parses email headers for unsubscribe links with enhanced header support."""
     unsubscribe_info = {"header_link": None, "mailto_link": None}
     try:
         headers = message_data.get('payload', {}).get('headers', [])
-        for header in headers:
-            if header['name'].lower() == 'list-unsubscribe':
-                value = header['value']
-                for part in value.split(','):
-                    part = part.strip()
-                    link = None
-                    if '<mailto:' in part:
-                        start = part.find('<') + 1
-                        end = part.find('>')
-                        if start < end:
-                           link = part[start:end]
-                           unsubscribe_info["mailto_link"] = link
-                    elif '<http' in part:
-                        start = part.find('<') + 1
-                        end = part.find('>')
-                        if start < end:
-                            link = part[start:end]
-                            if not unsubscribe_info["header_link"] or link.startswith('https'):
-                                unsubscribe_info["header_link"] = link
-                    elif part.strip().startswith('http'):
-                         link = part.strip()
-                         if not unsubscribe_info["header_link"] or link.startswith('https'):
-                            unsubscribe_info["header_link"] = link
-                    elif part.strip().startswith('mailto:'):
-                         link = part.strip()
-                         unsubscribe_info["mailto_link"] = link
-                if unsubscribe_info["header_link"]: break
+        
+        # Define the headers to check (in priority order)
+        unsubscribe_headers = [
+            'list-unsubscribe',
+            'x-list-unsubscribe',
+            'list-unsubscribe-post'  # Sometimes contains different links
+        ]
+        
+        # First pass: Check standard unsubscribe headers
+        for header_name in unsubscribe_headers:
+            for header in headers:
+                if header['name'].lower() == header_name:
+                    value = header['value']
+                    parse_unsubscribe_header_value(value, unsubscribe_info)
+                    # If we found an HTTP link, we can break early
+                    if unsubscribe_info["header_link"]:
+                        break
+        
+        # If no link found, check message body for common patterns (snippet in metadata)
+        if not unsubscribe_info["header_link"] and not unsubscribe_info["mailto_link"]:
+            # Try to extract from List-ID or other headers
+            list_id = None
+            feedback_id = None
+            
+            for header in headers:
+                if header['name'].lower() == 'list-id':
+                    list_id = header['value']
+                elif header['name'].lower() == 'feedback-id':
+                    feedback_id = header['value']
+            
+            # If we have list IDs, we could potentially construct unsubscribe URLs
+            # for known email service providers (ESPs)
+            if list_id:
+                # Extract list identifier from format like <list-id.domain.com>
+                match = re.search(r'<([^>]+)>', list_id) if '<' in list_id else None
+                list_identifier = match.group(1) if match else list_id.strip()
+                
+                # Check for common ESP patterns
+                if 'mailchimp' in list_identifier:
+                    # For demonstration - would need specific URL patterns
+                    pass
+                elif 'sendgrid' in list_identifier:
+                    # For demonstration
+                    pass
+                
+                # Don't set any fallback links here since we don't have reliable patterns
+                # without analyzing more data
+    
     except Exception as e:
         print(f"Error parsing message for unsubscribe link: {e}")
 
-    if unsubscribe_info["header_link"]: return unsubscribe_info["header_link"], "header_http"
-    elif unsubscribe_info["mailto_link"]: return unsubscribe_info["mailto_link"], "header_mailto"
-    else: return None, None
+    # Return links in order of preference
+    if unsubscribe_info["header_link"]: 
+        return unsubscribe_info["header_link"], "header_http"
+    elif unsubscribe_info["mailto_link"]: 
+        return unsubscribe_info["mailto_link"], "header_mailto"
+    else: 
+        return None, None
+
+def parse_unsubscribe_header_value(value, unsubscribe_info):
+    """Helper function to parse unsubscribe header values."""
+    for part in value.split(','):
+        part = part.strip()
+        link = None
+        
+        # Check for mailto link in brackets
+        if '<mailto:' in part:
+            start = part.find('<') + 1
+            end = part.find('>')
+            if start < end:
+                link = part[start:end]
+                unsubscribe_info["mailto_link"] = link
+        
+        # Check for http link in brackets
+        elif '<http' in part:
+            start = part.find('<') + 1
+            end = part.find('>')
+            if start < end:
+                link = part[start:end]
+                # Prefer HTTPS over HTTP links
+                if not unsubscribe_info["header_link"] or link.startswith('https'):
+                    unsubscribe_info["header_link"] = link
+        
+        # Check for bare http link
+        elif part.strip().startswith('http'):
+            link = part.strip()
+            # Prefer HTTPS over HTTP links
+            if not unsubscribe_info["header_link"] or link.startswith('https'):
+                unsubscribe_info["header_link"] = link
+        
+        # Check for bare mailto link
+        elif part.strip().startswith('mailto:'):
+            link = part.strip()
+            unsubscribe_info["mailto_link"] = link
 
 def render_unsubscribe_modal_content(success=True, message="", http_link=None):
     """Renders an HTML snippet for the unsubscribe result modal."""
@@ -199,11 +260,15 @@ def scan_emails():
         if MOCK_API:
              list_response = _get_mock_message_list(page_token=page_token)
         else:
+            # Enhanced Gmail API query for unsubscribable emails using configuration
+            # Uses OR operator to combine all terms from config for better coverage
+            enhanced_query = ' OR '.join(config.UNSUBSCRIBE_SEARCH_TERMS)
+            
             list_response = service.users().messages().list(
                 userId='me', 
                 maxResults=20, 
                 pageToken=page_token, 
-                q='unsubscribe',
+                q=enhanced_query,
                 labelIds=['INBOX']
             ).execute()
 
@@ -221,7 +286,11 @@ def scan_emails():
                         full_message = service.users().messages().get(
                             userId='me', id=msg_id, format='metadata',
                             # Request InternalDate along with other headers
-                            metadataHeaders=['List-Unsubscribe', 'From', 'Subject'] 
+                            # Add more unsubscribe-related headers to check
+                            metadataHeaders=[
+                                'List-Unsubscribe', 'List-Unsubscribe-Post', 'From', 'Subject',
+                                'X-List-Unsubscribe', 'List-Id', 'Feedback-ID'
+                            ] 
                         ).execute()
                     
                     unsubscribe_link, link_type = find_unsubscribe_links(full_message)
@@ -314,6 +383,9 @@ def unsubscribe_and_archive():
     unsubscribe_actions = [] # List of tuples: (email_id, link_type, link, sender)
     emails_to_archive = set(email_ids) if should_archive else set()
     
+    # Log the start of processing for debugging
+    print(f"Starting to process {len(email_ids)} emails for unsubscription/archiving")
+    
     # Batch fetch minimal details for all selected emails to group by sender efficiently
     sender_map = {}
     for msg_id in email_ids:
@@ -353,7 +425,13 @@ def unsubscribe_and_archive():
         first_email_id = sender_data["first_email_id"]
         sender_name = sender_data["name"]
         try:
-            full_message = service.users().messages().get(userId='me', id=first_email_id, format='metadata', metadataHeaders=['List-Unsubscribe', 'From']).execute()
+            full_message = service.users().messages().get(
+                userId='me', id=first_email_id, 
+                format='metadata', 
+                metadataHeaders=[
+                    'List-Unsubscribe', 'X-List-Unsubscribe', 'List-Unsubscribe-Post', 
+                    'From', 'List-Id', 'Feedback-ID'
+                ]).execute()
             link, link_type = find_unsubscribe_links(full_message)
             if link and link_type:
                 # Clean up sender name for display
@@ -372,10 +450,19 @@ def unsubscribe_and_archive():
     fail_count = 0
     errors = []
     http_link_for_modal = None # Store the last HTTP link for potential manual visit
+    successfully_processed_ids = [] # Store successfully processed email IDs
 
-    for msg_id, link_type, link, sender in unsubscribe_actions:
+    # Log total unsubscribe actions to perform
+    print(f"Processing {len(unsubscribe_actions)} unsubscribe actions for unique senders")
+    
+    # Map to track which sender's emails should be considered processed 
+    processed_sender_map = {}
+    
+    for idx, (msg_id, link_type, link, sender) in enumerate(unsubscribe_actions):
         try:
-            print(f"Processing unsubscribe for {sender} via {link_type}")
+            # Log progress for each sender (useful for debugging and monitoring)
+            print(f"[{idx+1}/{len(unsubscribe_actions)}] Processing unsubscribe for {sender} via {link_type}")
+            
             if link_type == 'header_http':
                 # We don't actually visit the link client-side did this
                 # Store it in case user needs it
@@ -383,6 +470,14 @@ def unsubscribe_and_archive():
                 print(f"  - (HTTP link for {sender}: {link})")
                 # Mark as success (assuming client-side fetch worked)
                 success_count += 1
+                
+                # Track this sender as successfully processed
+                if sender not in processed_sender_map:
+                    processed_sender_map[sender] = True
+                
+                # Add this email ID to successfully processed list
+                successfully_processed_ids.append(msg_id)
+                
             elif link_type == 'header_mailto':
                 # Parse and send mailto
                 parsed_mailto = urlparse(link)
@@ -405,11 +500,56 @@ def unsubscribe_and_archive():
                     service.users().messages().send(userId='me', body=send_message_body).execute()
                     print(f"  - Sent mailto for {sender}")
                 success_count += 1
+                
+                # Track this sender as successfully processed
+                if sender not in processed_sender_map:
+                    processed_sender_map[sender] = True
+                
+                # Add this email ID to successfully processed list
+                successfully_processed_ids.append(msg_id)
+            
+            # Log successful completion
+            print(f"  ✓ Successfully processed unsubscribe for {sender}")
+            
         except Exception as e:
             fail_count += 1
             error_detail = f"Failed to process unsubscribe for {sender}: {e}"
             print(f"!!! ERROR: {error_detail} !!!")
             errors.append(error_detail)
+            
+            # Mark this sender as failed
+            if sender not in processed_sender_map:
+                processed_sender_map[sender] = False
+
+    # Now find all other emails from successfully processed senders
+    all_processed_ids = set(successfully_processed_ids)
+    for email_id in email_ids:
+        # Skip if already in our successfully processed list
+        if email_id in all_processed_ids:
+            continue
+            
+        try:
+            # Get sender for this email
+            full_message = service.users().messages().get(userId='me', id=email_id, format='metadata', metadataHeaders=['From']).execute()
+            headers = full_message.get('payload', {}).get('headers', [])
+            sender_raw = next((h['value'] for h in headers if h['name'].lower() == 'from'), None)
+            
+            if sender_raw:
+                # Clean sender name for comparison
+                if '<' in sender_raw and '>' in sender_raw:
+                    display_sender = sender_raw[:sender_raw.find('<')].strip().replace('"', '') or sender_raw
+                else:
+                    display_sender = sender_raw
+                
+                # If this email is from a successfully processed sender, add it to our list
+                if display_sender in processed_sender_map and processed_sender_map[display_sender]:
+                    print(f"Adding email {email_id} to processed list - from sender {display_sender}")
+                    all_processed_ids.add(email_id)
+        except Exception as e:
+            print(f"Error getting sender for email {email_id}: {e}")
+            
+    # Convert back to list for further processing
+    successfully_processed_ids = list(all_processed_ids)
 
     # --- Archive Emails (if requested) ---
     archive_success_count = 0
@@ -421,6 +561,11 @@ def unsubscribe_and_archive():
             try:
                 service.users().messages().modify(userId='me', id=msg_id, body={'removeLabelIds': ['INBOX']}).execute()
                 archive_success_count += 1
+                
+                # Add successfully archived email to our list if not already there
+                if msg_id not in all_processed_ids:
+                    successfully_processed_ids.append(msg_id)
+                    
             except Exception as e:
                 archive_fail_count += 1
                 error_detail = f"Failed to archive {msg_id}: {e}"
@@ -444,16 +589,26 @@ def unsubscribe_and_archive():
          message_parts.append("Archiving was disabled.")
 
     final_message = " ".join(message_parts) if message_parts else "No actions performed."
+    
+    # Extract processed sender details for frontend display
+    processed_senders = []
+    for msg_id, link_type, link, sender in unsubscribe_actions:
+        if processed_sender_map.get(sender, False) and sender not in processed_senders:
+            processed_senders.append(sender)
 
+    print(f"Successfully processed {len(successfully_processed_ids)} emails")
+    
     response_data = {
         "success": overall_success,
         "message": final_message,
         "details": {
             "unsubscribe_errors": errors,
-            "archive_errors": archive_errors
+            "archive_errors": archive_errors,
+            "processed_senders": processed_senders,  # Add processed senders to the response
+            "processed_email_ids": successfully_processed_ids  # Add list of processed email IDs
         },
         # Provide the last HTTP link in case manual action is needed
-        "http_link": http_link_for_modal if fail_count > 0 else None 
+        "http_link": http_link_for_modal if http_link_for_modal else None # Show link even on success
     }
 
     status_code = 200 if overall_success else 500 # Use 500 if any part failed

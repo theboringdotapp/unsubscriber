@@ -660,10 +660,32 @@
         // Store the IDs we are about to process for removal later
         window.processedEmailIds = [...selectedIdsFromStorage]; 
         
+        // Map email IDs to their senders for progress tracking
+        const senderMap = {};
+        for (const emailId of selectedIdsFromStorage) {
+            const checkbox = document.querySelector(`.email-checkbox[value="${emailId}"]`);
+            if (checkbox) {
+                const sender = checkbox.getAttribute('data-sender');
+                if (sender) {
+                    if (!senderMap[sender]) {
+                        senderMap[sender] = [];
+                    }
+                    senderMap[sender].push(emailId);
+                }
+            }
+        }
+        
+        // Convert the map to an array of sender names for display
+        const senders = Object.keys(senderMap);
+        window.totalSendersToProcess = senders.length;
+        window.currentSenderIndex = 0;
+        
         const archive = document.getElementById('archive-toggle').checked;
         const buttonId = 'unsubscribe-button';
-        setLoading(buttonId, archive ? 'Processing...' : 'Processing...'); // Use a generic message
-
+        
+        // Show progress in modal before starting AJAX request
+        showUnsubscribeProgressModal(senders);
+        
         const formData = new FormData();
         // Send ALL selected IDs from storage to the backend
         selectedIdsFromStorage.forEach(id => formData.append('email_ids', id));
@@ -672,32 +694,168 @@
         const url = "{{ url_for('scan.unsubscribe_and_archive') }}";
 
         try {
+            // Update progress indicator during the request
+            const progressInterval = setInterval(() => {
+                updateProgress(Math.min(window.currentSenderIndex + 0.5, window.totalSendersToProcess));
+            }, 500);
+            
             const response = await fetch(url, {
                 method: 'POST',
                 body: formData
             });
             
+            clearInterval(progressInterval);
+            
             const resultData = await response.json(); // Expect JSON
             
             if (response.ok && resultData.success) {
-                showModal(renderSuccessModalContent(resultData.message, resultData.http_link));
+                // Show completion modal with results including the full result data
+                showModal(renderSuccessModalContent(resultData.message, resultData.http_link, resultData));
                 // Clear storage ONLY on successful processing of ALL items
                 saveSelectedEmailsToStorage([]); 
             } else {
                 // Use error message from backend if available
                 const errorMessage = resultData.error || `Request failed with status ${response.status}`;
                 showModal(renderErrorModalContent(errorMessage));
-                 // Don't clear storage on failure
-                 window.processedEmailIds = []; // Don't remove items on failure
+                // Don't clear storage on failure
+                window.processedEmailIds = []; // Don't remove items on failure
             }
 
         } catch (error) {
             console.error('Error unsubscribing:', error);
             showModal(renderErrorModalContent('Network error occurred. Please try again.'));
-             window.processedEmailIds = [];
+            window.processedEmailIds = [];
         } finally {
             hideLoading(buttonId);
             // Action bar update happens in closeModal or removeProcessedEmails
+        }
+    }
+    
+    function showUnsubscribeProgressModal(senders) {
+        const totalSenders = senders.length;
+        let sendersHtml = '';
+        
+        // Generate a list of senders with progress indicators
+        senders.forEach((sender, index) => {
+            sendersHtml += `
+            <div class="sender-progress-item flex items-center justify-between py-1" data-sender="${sender}">
+                <span class="text-sm text-foreground truncate max-w-[300px]" title="${sender}">${sender}</span>
+                <span class="status-indicator flex items-center">
+                    <span class="status-text text-xs text-muted-foreground">Waiting</span>
+                    <div class="loading-spinner ml-2 w-4 h-4 hidden">
+                        <svg class="animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                    </div>
+                    <svg class="check-icon w-4 h-4 text-success hidden" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                    </svg>
+                </span>
+            </div>`;
+        });
+
+        const progressModalHtml = `
+        <div class="bg-background rounded-lg p-6">
+            <div class="mb-4 text-center">
+                <h3 class="text-xl font-semibold text-foreground">Unsubscribing...</h3>
+                <p class="text-sm text-muted-foreground mt-2">Sending unsubscribe requests for selected emails.</p>
+            </div>
+            
+            <div class="relative pt-1 mb-4">
+                <div class="w-full bg-muted rounded-full">
+                    <div id="progress-bar" class="bg-brand h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+                <div class="flex justify-between text-xs text-muted-foreground mt-1">
+                    <span id="progress-text">0/${totalSenders} senders</span>
+                    <span id="progress-percentage">0%</span>
+                </div>
+            </div>
+            
+            <div class="max-h-60 overflow-y-auto border border-border rounded-md p-2">
+                <div id="sender-progress-list">
+                    ${sendersHtml}
+                </div>
+            </div>
+        </div>`;
+        
+        showModal(progressModalHtml);
+        
+        // Start the first item as processing
+        if (senders.length > 0) {
+            updateSenderStatus(senders[0], 'processing');
+        }
+    }
+    
+    function updateProgress(completedCount) {
+        const totalCount = window.totalSendersToProcess || 1;
+        const progressPercent = Math.floor((completedCount / totalCount) * 100);
+        
+        // Update the progress bar
+        const progressBar = document.getElementById('progress-bar');
+        const progressText = document.getElementById('progress-text');
+        const progressPercentage = document.getElementById('progress-percentage');
+        
+        if (progressBar) progressBar.style.width = `${progressPercent}%`;
+        if (progressText) progressText.innerText = `${Math.floor(completedCount)}/${totalCount} senders`;
+        if (progressPercentage) progressPercentage.innerText = `${progressPercent}%`;
+        
+        // Mock the progress of sender processing for visual feedback
+        const senders = Object.keys(getSenderMap());
+        
+        if (window.currentSenderIndex < senders.length) {
+            // Update the current sender to 'processing'
+            const currentSender = senders[window.currentSenderIndex];
+            updateSenderStatus(currentSender, 'processing');
+            
+            // Mark previous senders as 'completed'
+            if (window.currentSenderIndex > 0) {
+                const previousSender = senders[window.currentSenderIndex - 1];
+                updateSenderStatus(previousSender, 'completed');
+                window.currentSenderIndex++;
+            } else {
+                window.currentSenderIndex++;
+            }
+        }
+    }
+    
+    function getSenderMap() {
+        const senderMap = {};
+        for (const emailId of window.processedEmailIds || []) {
+            const checkbox = document.querySelector(`.email-checkbox[value="${emailId}"]`);
+            if (checkbox) {
+                const sender = checkbox.getAttribute('data-sender');
+                if (sender) {
+                    if (!senderMap[sender]) {
+                        senderMap[sender] = [];
+                    }
+                    senderMap[sender].push(emailId);
+                }
+            }
+        }
+        return senderMap;
+    }
+    
+    function updateSenderStatus(sender, status) {
+        const senderItem = document.querySelector(`.sender-progress-item[data-sender="${sender}"]`);
+        if (!senderItem) return;
+        
+        const statusText = senderItem.querySelector('.status-text');
+        const spinner = senderItem.querySelector('.loading-spinner');
+        const checkIcon = senderItem.querySelector('.check-icon');
+        
+        // Reset all indicators
+        spinner.classList.add('hidden');
+        checkIcon.classList.add('hidden');
+        
+        if (status === 'waiting') {
+            if (statusText) statusText.innerText = 'Waiting';
+        } else if (status === 'processing') {
+            if (statusText) statusText.innerText = 'Processing';
+            spinner.classList.remove('hidden');
+        } else if (status === 'completed') {
+            if (statusText) statusText.innerText = 'Completed';
+            checkIcon.classList.remove('hidden');
         }
     }
 
@@ -765,19 +923,41 @@
     window.removeProcessedEmails = function() {
         // Use the stored processedEmailIds set during the action call
         if (window.processedEmailIds && window.processedEmailIds.length > 0) {
+            console.log(`Removing ${window.processedEmailIds.length} processed emails from view`);
+            
             window.processedEmailIds.forEach(emailId => {
                 const emailRow = document.getElementById(`email-${emailId}`);
-                const sender = emailRow?.querySelector('.email-checkbox')?.dataset.sender;
-                emailRow?.remove();
+                if (!emailRow) {
+                    console.warn(`Could not find email row with ID: email-${emailId}`);
+                    return;
+                }
+                
+                const checkbox = emailRow.querySelector('.email-checkbox');
+                const sender = checkbox?.dataset.sender;
+                
+                // Remove the email row from DOM
+                emailRow.remove();
+                console.log(`Removed email ID: ${emailId}`);
                 
                 // Check if sender group is now empty
                 if (sender) {
-                    const senderId = sender.replace(' ', '-').replace('<', '').replace('>', '').replace('@', '-').replace('.', '-');
+                    // Use the same regex pattern as in other parts of the code
+                    const senderId = sender.replace(/\s+/g, '-')
+                        .replace(/[<>]/g, '')
+                        .replace(/@/g, '-')
+                        .replace(/\./g, '-');
+                    
                     const senderGroup = document.getElementById(`sender-group-${senderId}`);
+                    if (!senderGroup) {
+                        console.warn(`Could not find sender group for: ${sender}, ID: ${senderId}`);
+                        return;
+                    }
+                    
                     // Check if the email list div exists and has no more email rows
-                    const emailsDiv = senderGroup?.querySelector('.sender-emails');
+                    const emailsDiv = senderGroup.querySelector('.sender-emails');
                     if (emailsDiv && emailsDiv.querySelectorAll('.email-row').length === 0) {
                         senderGroup.remove();
+                        console.log(`Removed empty sender group: ${sender}`);
                     }
                 }
             });
@@ -790,25 +970,90 @@
         closeModal();
     }
 
-    // Render success modal content dynamically
-    function renderSuccessModalContent(message, http_link = null) {
+    // Render success modal content dynamically with processed senders summary
+    function renderSuccessModalContent(message, http_link = null, resultData = null) {
+        console.log("Rendering success modal with:", { message, http_link, resultData });
+        
+        // Get the list of senders that were processed
+        let senders = [];
+        let processedEmailIds = [];
+        
+        // First try to use the backend-provided processed senders list
+        if (resultData && resultData.details) {
+            if (resultData.details.processed_senders) {
+                senders = resultData.details.processed_senders;
+                console.log(`Found ${senders.length} processed senders from backend data`);
+            }
+            
+            // If server returned processed email IDs, use those
+            if (resultData.details.processed_email_ids) {
+                processedEmailIds = resultData.details.processed_email_ids;
+                console.log(`Found ${processedEmailIds.length} processed email IDs from backend data`);
+                // Update the window.processedEmailIds to ensure we only remove properly processed emails
+                window.processedEmailIds = processedEmailIds;
+            }
+        }
+        
+        // Fall back to client-side tracking if backend data not available
+        if (senders.length === 0) {
+            const senderMap = getSenderMap();
+            senders = Object.keys(senderMap);
+            console.log(`Using client-side fallback, found ${senders.length} senders`);
+        }
+        
+        // Prepare a summary of processed senders
+        let senderSummary = '';
+        if (senders.length > 0) {
+            const maxSendersToShow = 5; // Limit the number of senders shown to avoid cluttering the modal
+            const displayedSenders = senders.slice(0, maxSendersToShow);
+            const remainingSenders = senders.length - maxSendersToShow;
+            
+            let sendersList = displayedSenders.map(sender => 
+                `<li class="text-sm text-foreground py-1 flex items-center">
+                    <svg class="w-4 h-4 text-success mr-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                    </svg>
+                    <span class="truncate max-w-[300px]" title="${sender}">${sender}</span>
+                </li>`
+            ).join('');
+            
+            if (remainingSenders > 0) {
+                sendersList += `<li class="text-sm text-muted-foreground py-1">And ${remainingSenders} more sender${remainingSenders > 1 ? 's' : ''}...</li>`;
+            }
+            
+            senderSummary = `
+            <div class="mt-4 text-left w-full">
+                <h4 class="text-sm font-medium text-foreground mb-1">Processed senders:</h4>
+                <ul class="border border-border rounded-md p-2 max-h-40 overflow-y-auto">
+                    ${sendersList}
+                </ul>
+            </div>`;
+        }
+        
+        // Include http_link if provided
         let linkHtml = '';
         if (http_link) {
             linkHtml = `<p class="text-sm mt-2 text-muted-foreground">If needed, you can <a href="${http_link}" target="_blank" class="text-brand hover:underline focus-ring">visit the link manually</a>.</p>`;
         }
+        
         return `
-        <div class="bg-background rounded-lg p-6 text-center flex flex-col items-center">
-            <div class="checkmark-container mb-4">
-                <svg class="checkmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52">
-                    <circle class="checkmark-circle" cx="26" cy="26" r="25" fill="none"/>
-                    <path class="checkmark-check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
-                </svg>
+        <div class="bg-background rounded-lg p-6 flex flex-col items-center">
+            <div class="text-center">
+                <div class="checkmark-container mb-4">
+                    <svg class="checkmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52">
+                        <circle class="checkmark-circle" cx="26" cy="26" r="25" fill="none"/>
+                        <path class="checkmark-check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
+                    </svg>
+                </div>
+                <h3 class="text-xl font-semibold text-success mb-2">Success!</h3>
+                <p class="text-foreground">${message || "Operation completed successfully."}</p>
+                ${linkHtml}
             </div>
-            <h3 class="text-xl font-semibold text-success mb-2">Success!</h3>
-            <p class="text-foreground">${message || "Operation completed successfully."}</p>
-            ${linkHtml}
+            
+            ${senderSummary}
+            
             <button 
-                class="mt-6 btn btn-primary btn-md focus-ring"
+                class="mt-6 btn btn-primary btn-md focus-ring w-full"
                 onclick="window.removeProcessedEmails()">
                 Done
             </button>

@@ -17,6 +17,19 @@ MOCK_API = False
 # Scan limit
 MAX_SCAN_EMAILS = 50
 
+# Gmail API search query terms
+# These terms are combined with OR to find emails that might have unsubscribe options
+UNSUBSCRIBE_SEARCH_TERMS = [
+    'unsubscribe',
+    '"manage subscriptions"',
+    '"email preferences"', 
+    '"click here to unsubscribe"',
+    '"opt-out"',
+    '"update preferences"',
+    '"manage your account"',
+    'newsletter'
+]
+
 # --- Base URL / Redirect URI (Calculated based on Env Vars) ---
 # Calculating these here means they are fixed at import time.
 PROD_URL = os.environ.get('VERCEL_PROJECT_PRODUCTION_URL')
