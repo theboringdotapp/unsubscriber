@@ -14,5 +14,9 @@
             "src": "/(.*)",
             "dest": "api/index.py"
         }
+    ],
+    "watchPatterns": [
+        "api/**",
+        "templates/**"
     ]
 }
