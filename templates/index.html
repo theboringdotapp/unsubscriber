@@ -214,10 +214,11 @@
         <div class="flex flex-col md:flex-row justify-between items-center">
             <div class="mb-4 md:mb-0">
                 <div class="flex items-center space-x-2">
-                    <span class="inline-flex items-center justify-center p-1 bg-brand/10 rounded-full">
-                        <span class="w-2 h-2 bg-brand rounded-full"></span>
+               
+                    <span class="font-semibold">
+                        <span class="footer-vibe-coded">vibecoded</span> 
+                        by <a href="https://theboring.app" target="_blank" class="hover:underline">theboring.app</a>
                     </span>
-                    <span class="font-semibold"><span class="text-brand">Unsubscriber</span> by <a href="https://theboring.app" target="_blank" class="hover:underline">theboring.app</a></span>
                 </div>
                 <p class="text-sm text-muted-foreground mt-2">Helping you keep your inbox clean and organized</p>
             </div>
@@ -264,6 +265,60 @@
         0% { transform: scale(0.8); opacity: 0.8; }
         50% { transform: scale(1.2); opacity: 1; }
         100% { transform: scale(0.8); opacity: 0.8; }
+    }
+    
+    /* Subtle footer text with hover effect */
+    .footer-vibe-coded {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 12px;
+        font-weight: 500;
+        position: relative;
+        overflow: hidden;
+        transition: all 0.3s ease;
+        color: hsl(var(--foreground));
+        letter-spacing: 0.5px;
+        cursor: default;
+    }
+    
+    .footer-vibe-coded:hover {
+        background-clip: text;
+        -webkit-background-clip: text;
+        color: transparent;
+        background-image: linear-gradient(90deg, 
+            #ff00aa, #ff0066, #e100ff, #7f00ff, #00c3ff, #00ffe1, #ff00aa);
+        background-size: 200% auto;
+        animation: textGradientShift 3s linear infinite;
+        text-shadow: 0 0 5px rgba(255, 0, 170, 0.5);
+    }
+    
+ 
+    @keyframes textGradientShift {
+        0% { background-position: 0% center; }
+        100% { background-position: 200% center; }
+    }
+        
+   
+    
+ 
+    
+    @keyframes neon {
+        0%, 18%, 22%, 26%, 58%, 62%, 100% {
+            text-shadow:
+                0 0 2px #fff,
+                0 0 4px #fff,
+                0 0 8px #f80022,
+                0 0 12px #f80022;
+        }
+        20%, 24%, 60% {        
+            text-shadow: none;
+        }    
+    }
+    
+    @keyframes shine {
+        0% { left: -100%; }
+        20% { left: 100%; }
+        100% { left: 100%; }
     }
     
     .fade-in-up {
