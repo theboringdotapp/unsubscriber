@@ -657,92 +657,414 @@
             return;
         }
         
-        // Store the IDs we are about to process for removal later
-        window.processedEmailIds = [...selectedIdsFromStorage]; 
+        // Limit to 25 emails at a time
+        const MAX_EMAILS = 25;
+        if (selectedIdsFromStorage.length > MAX_EMAILS) {
+            alert(`For reliable processing, please limit your selection to ${MAX_EMAILS} emails at a time. Currently ${selectedIdsFromStorage.length} are selected.`);
+            return;
+        }
         
-        // Map email IDs to their senders for progress tracking
+        // Map email IDs to their senders for processing
         const senderMap = {};
+        const emailsWithNoLinks = [];
+        const allEmailDetails = [];
+        
+        // First analyze all selected emails to categorize them
         for (const emailId of selectedIdsFromStorage) {
             const checkbox = document.querySelector(`.email-checkbox[value="${emailId}"]`);
-            if (checkbox) {
-                const sender = checkbox.getAttribute('data-sender');
-                if (sender) {
-                    if (!senderMap[sender]) {
-                        senderMap[sender] = [];
+            if (!checkbox) {
+                console.warn(`Checkbox not found for email ID: ${emailId}`);
+                continue;
+            }
+            
+            const sender = checkbox.getAttribute('data-sender');
+            const emailRow = document.getElementById(`email-${emailId}`);
+            
+            if (!sender || !emailRow) {
+                console.warn(`Missing sender or row for email ID: ${emailId}`);
+                continue;
+            }
+            
+            // Extract unsubscribe link if available
+            let unsubscribeLink = null;
+            
+            // Try to find the link in different ways
+            // First check for direct links from email row
+            const linkElements = emailRow.querySelectorAll('a.unsubscribe-link, a.email-link');
+            if (linkElements.length > 0) {
+                unsubscribeLink = linkElements[0].getAttribute('href');
+            }
+            
+            // If no link found in email row, try to find sender's primary unsubscribe link
+            if (!unsubscribeLink) {
+                // Find the sender group element
+                const senderId = sender.replace(/\s+/g, '-')
+                    .replace(/[<>]/g, '')
+                    .replace(/@/g, '-')
+                    .replace(/\./g, '-');
+                
+                const senderGroup = document.getElementById(`sender-group-${senderId}`);
+                if (senderGroup) {
+                    const headerLinks = senderGroup.querySelectorAll('.sender-header a');
+                    if (headerLinks.length > 0) {
+                        unsubscribeLink = headerLinks[0].getAttribute('href');
                     }
-                    senderMap[sender].push(emailId);
                 }
+            }
+            
+            // Store email details
+            const emailDetails = {
+                id: emailId,
+                sender: sender,
+                link: unsubscribeLink
+            };
+            
+            allEmailDetails.push(emailDetails);
+            
+            // Group by sender
+            if (!senderMap[sender]) {
+                senderMap[sender] = [];
+            }
+            senderMap[sender].push(emailId);
+            
+            // Track emails with no links
+            if (!unsubscribeLink) {
+                emailsWithNoLinks.push(emailId);
             }
         }
         
-        // Convert the map to an array of sender names for display
         const senders = Object.keys(senderMap);
         window.totalSendersToProcess = senders.length;
         window.currentSenderIndex = 0;
         
-        const archive = document.getElementById('archive-toggle').checked;
+        const shouldArchive = document.getElementById('archive-toggle').checked;
         const buttonId = 'unsubscribe-button';
         
-        // Show progress in modal before starting AJAX request
-        showUnsubscribeProgressModal(senders);
+        // Show progress modal and get link maps
+        const { httpLinks, mailtoLinks } = showUnsubscribeProgressModal(senders);
         
-        const formData = new FormData();
-        // Send ALL selected IDs from storage to the backend
-        selectedIdsFromStorage.forEach(id => formData.append('email_ids', id));
-        formData.append('archive', archive ? 'true' : 'false');
+        // Process HTTP links on the client side
+        const httpSenders = Object.keys(httpLinks);
+        const mailtoSenders = Object.keys(mailtoLinks);
         
-        const url = "{{ url_for('scan.unsubscribe_and_archive') }}";
-
-        try {
-            // Update progress indicator during the request
-            const progressInterval = setInterval(() => {
-                updateProgress(Math.min(window.currentSenderIndex + 0.5, window.totalSendersToProcess));
-            }, 500);
+        console.log(`Processing client-side: ${httpSenders.length} HTTP links, ${mailtoSenders.length} mailto links`);
+        console.log(`${emailsWithNoLinks.length} emails have no direct unsubscribe links`);
+        
+        const successfullyProcessedIds = [];
+        const manuallyRequiredIds = [];  // Track IDs requiring manual action
+        const failedIds = [];
+        const errors = [];
+        let lastHttpLink = null;
+        
+        // Client-side HTTP link processing
+        console.log(`Starting to process ${httpSenders.length} HTTP links in parallel`);
+        
+        // Process all HTTP links concurrently using Promise.all
+        const httpPromises = httpSenders.map(async (sender) => {
+            const link = httpLinks[sender];
+            updateSenderStatus(sender, 'processing');
             
-            const response = await fetch(url, {
-                method: 'POST',
-                body: formData
-            });
-            
-            clearInterval(progressInterval);
-            
-            const resultData = await response.json(); // Expect JSON
-            
-            if (response.ok && resultData.success) {
-                // Show completion modal with results including the full result data
-                showModal(renderSuccessModalContent(resultData.message, resultData.http_link, resultData));
-                // Clear storage ONLY on successful processing of ALL items
-                saveSelectedEmailsToStorage([]); 
-            } else {
-                // Use error message from backend if available
-                const errorMessage = resultData.error || `Request failed with status ${response.status}`;
-                showModal(renderErrorModalContent(errorMessage));
-                // Don't clear storage on failure
-                window.processedEmailIds = []; // Don't remove items on failure
+            try {
+                console.log(`Processing HTTP link for ${sender}: ${link}`);
+                
+                // Store for the modal (prioritize manual links)
+                if (!lastHttpLink) {
+                    lastHttpLink = link;
+                }
+                
+                let automaticSuccess = false;
+                
+                if (link) {
+                    try {
+                        // Make a background HTTP request instead of opening a tab
+                        console.log(`Fetching link in background: ${link}`);
+                        
+                        // Using fetch with a timeout to avoid hanging
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+                        
+                        const response = await fetch(link, {
+                            method: 'GET',
+                            mode: 'no-cors', // Important for cross-origin requests
+                            redirect: 'follow',
+                            signal: controller.signal
+                        });
+                        
+                        clearTimeout(timeoutId);
+                        
+                        // Check if it's likely the unsubscribe was successful
+                        // In no-cors mode, we don't have full response details, but we can assume success if it didn't throw
+                        automaticSuccess = true;
+                        console.log(`Successfully fetched ${link} for ${sender}`);
+                        
+                    } catch (fetchError) {
+                        console.warn(`Fetch request failed for ${link}: ${fetchError.message}`);
+                        automaticSuccess = false;
+                    }
+                }
+                
+                // Mark as requiring manual action or automated success
+                const senderEmailIds = senderMap[sender] || [];
+                
+                if (automaticSuccess) {
+                    // Automatic success
+                    senderEmailIds.forEach(id => {
+                        if (!successfullyProcessedIds.includes(id)) {
+                            successfullyProcessedIds.push(id);
+                        }
+                    });
+                    
+                    updateSenderStatus(sender, 'completed');
+                } else {
+                    // Manual action required
+                    senderEmailIds.forEach(id => {
+                        if (!manuallyRequiredIds.includes(id)) {
+                            manuallyRequiredIds.push(id);
+                        }
+                    });
+                    
+                    // Update UI to show manual action required with link
+                    updateSenderStatus(sender, 'manual', 'http');
+                }
+                
+                window.currentSenderIndex++;
+                updateProgress(window.currentSenderIndex);
+                
+                return { 
+                    success: automaticSuccess, 
+                    manualRequired: !automaticSuccess,
+                    sender,
+                    link 
+                };
+                
+            } catch (error) {
+                console.error(`Error processing HTTP link for ${sender}:`, error);
+                errors.push(`Failed to process unsubscribe for ${sender}: ${error.message}`);
+                failedIds.push(...(senderMap[sender] || []));
+                updateSenderStatus(sender, 'error');
+                
+                return { success: false, sender, error };
             }
-
-        } catch (error) {
-            console.error('Error unsubscribing:', error);
-            showModal(renderErrorModalContent('Network error occurred. Please try again.'));
-            window.processedEmailIds = [];
-        } finally {
-            hideLoading(buttonId);
-            // Action bar update happens in closeModal or removeProcessedEmails
+        });
+        
+        // Wait for all HTTP link processing to complete
+        await Promise.all(httpPromises);
+        console.log(`Completed processing ${httpSenders.length} HTTP links`);
+        console.log(`Completed processing ${httpSenders.length} HTTP links`);
+        
+        // Process mailto links and any remaining emails through the backend
+        const emailsForBackend = [...emailsWithNoLinks];
+        mailtoSenders.forEach(sender => {
+            emailsForBackend.push(...(senderMap[sender] || []));
+        });
+        
+        if (emailsForBackend.length > 0) {
+            console.log(`Sending ${emailsForBackend.length} emails to backend for mailto/server processing`);
+            
+            const formData = new FormData();
+            emailsForBackend.forEach(id => formData.append('email_ids', id));
+            formData.append('archive', 'false'); // We'll do batch archiving separately
+            
+            const url = "{{ url_for('scan.unsubscribe_and_archive') }}";
+            
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const resultData = await response.json();
+                
+                if (response.ok && resultData.success) {
+                    console.log('Backend processing successful');
+                    
+                    // Add backend-processed IDs to our list
+                    if (resultData.details && resultData.details.processed_email_ids) {
+                        resultData.details.processed_email_ids.forEach(id => {
+                            if (!successfullyProcessedIds.includes(id)) {
+                                successfullyProcessedIds.push(id);
+                            }
+                        });
+                    }
+                    
+                    // Update processing status for backend-processed senders
+                    if (resultData.details && resultData.details.processed_senders) {
+                        resultData.details.processed_senders.forEach(sender => {
+                            updateSenderStatus(sender, 'completed');
+                        });
+                    }
+                    
+                    // Get any HTTP link from backend
+                    if (resultData.http_link && !lastHttpLink) {
+                        lastHttpLink = resultData.http_link;
+                    }
+                    
+                } else {
+                    console.error('Backend processing error:', resultData.error);
+                    errors.push(resultData.error || 'Backend processing failed');
+                    
+                    // Add error details if available
+                    if (resultData.details) {
+                        if (resultData.details.unsubscribe_errors) {
+                            errors.push(...resultData.details.unsubscribe_errors);
+                        }
+                    }
+                }
+                
+            } catch (error) {
+                console.error('Error during backend processing:', error);
+                errors.push(`Network error during backend processing: ${error.message}`);
+            }
         }
+        
+        // Perform batch archive if needed
+        if (shouldArchive && successfullyProcessedIds.length > 0) {
+            console.log(`Batch archiving ${successfullyProcessedIds.length} emails`);
+            
+            const formData = new FormData();
+            successfullyProcessedIds.forEach(id => formData.append('email_ids', id));
+            
+            try {
+                const response = await fetch("{{ url_for('scan.archive_emails') }}", {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const archiveResult = await response.json();
+                
+                if (!response.ok || !archiveResult.success) {
+                    console.error('Archive operation failed:', archiveResult.error);
+                    
+                    if (archiveResult.details && archiveResult.details.archive_errors) {
+                        errors.push(...archiveResult.details.archive_errors);
+                    } else {
+                        errors.push('Failed to archive some emails');
+                    }
+                }
+                
+            } catch (error) {
+                console.error('Error during archive operation:', error);
+                errors.push(`Network error during archiving: ${error.message}`);
+            }
+        }
+        
+        // Final update to UI
+        // Consider both automatic and manual actions as "processed" for UI purposes
+        window.processedEmailIds = [...successfullyProcessedIds, ...manuallyRequiredIds];
+        
+        // Construct final message
+        const successCount = successfullyProcessedIds.length;
+        const manualCount = manuallyRequiredIds.length;
+        const failCount = failedIds.length;
+        
+        let message = '';
+        
+        if (successCount > 0) {
+            message += `Automatically processed ${successCount} email${successCount !== 1 ? 's' : ''}.`;
+        }
+        
+        if (manualCount > 0) {
+            if (message) message += ' ';
+            message += `${manualCount} email${manualCount !== 1 ? 's' : ''} require manual action.`;
+        }
+        
+        if (failCount > 0) {
+            if (message) message += ' ';
+            message += `${failCount} email${failCount !== 1 ? 's' : ''} failed.`;
+        }
+        
+        if (shouldArchive && (successCount > 0 || manualCount > 0)) {
+            if (message) message += ' ';
+            const archivedCount = successCount + manualCount;
+            message += `Archived ${archivedCount} email${archivedCount !== 1 ? 's' : ''}.`;
+        }
+        
+        // Get all manual links for display in the result modal
+        const manualLinks = {};
+        
+        // Collect links for emails requiring manual action
+        for (const sender of Object.keys(httpLinks)) {
+            if (senderMap[sender] && senderMap[sender].some(id => manuallyRequiredIds.includes(id))) {
+                manualLinks[sender] = httpLinks[sender];
+            }
+        }
+        
+        for (const sender of Object.keys(mailtoLinks)) {
+            if (senderMap[sender] && senderMap[sender].some(id => manuallyRequiredIds.includes(id))) {
+                manualLinks[sender] = mailtoLinks[sender];
+            }
+        }
+        
+        const resultData = {
+            success: failCount === 0,
+            message: message.trim(),
+            details: {
+                unsubscribe_errors: errors,
+                processed_senders: senders.filter(sender => {
+                    // Include senders where at least one email was processed
+                    return senderMap[sender].some(id => 
+                        successfullyProcessedIds.includes(id) || manuallyRequiredIds.includes(id)
+                    );
+                }),
+                processed_email_ids: window.processedEmailIds,
+                manual_links: manualLinks,
+                manual_count: manualCount
+            },
+            http_link: lastHttpLink,
+            has_manual_actions: manualCount > 0
+        };
+        
+        // Show completion modal
+        showModal(renderSuccessModalContent(resultData.message, resultData.http_link, resultData));
+        
+        // Clear storage on successful processing
+        if (successCount > 0) {
+            saveSelectedEmailsToStorage([]);
+        }
+        
+        hideLoading(buttonId);
     }
     
     function showUnsubscribeProgressModal(senders) {
         const totalSenders = senders.length;
         let sendersHtml = '';
         
+        // Get HTTP links from sender map
+        const httpLinks = {};
+        const mailtoLinks = {};
+        
         // Generate a list of senders with progress indicators
         senders.forEach((sender, index) => {
+            // Store link info for each sender
+            const senderId = sender.replace(/\s+/g, '-')
+                .replace(/[<>]/g, '')
+                .replace(/@/g, '-')
+                .replace(/\./g, '-');
+                
+            const senderGroup = document.getElementById(`sender-group-${senderId}`);
+            let link = '';
+            let linkType = '';
+            
+            if (senderGroup) {
+                const headerLinks = senderGroup.querySelectorAll('.sender-header a');
+                if (headerLinks.length > 0) {
+                    link = headerLinks[0].getAttribute('href') || '';
+                    linkType = link.startsWith('mailto:') ? 'mailto' : 'http';
+                    
+                    if (linkType === 'mailto') {
+                        mailtoLinks[sender] = link;
+                    } else if (linkType === 'http') {
+                        httpLinks[sender] = link;
+                    }
+                }
+            }
+            
             sendersHtml += `
-            <div class="sender-progress-item flex items-center justify-between py-1" data-sender="${sender}">
-                <span class="text-sm text-foreground truncate max-w-[300px]" title="${sender}">${sender}</span>
-                <span class="status-indicator flex items-center">
-                    <span class="status-text text-xs text-muted-foreground">Waiting</span>
-                    <div class="loading-spinner ml-2 w-4 h-4 hidden">
+            <div class="sender-progress-item flex items-center justify-between py-2 border-b border-border last:border-0" data-sender="${sender}">
+                <span class="text-sm text-foreground truncate max-w-[200px]" title="${sender}">${sender}</span>
+                <span class="status-indicator flex items-center gap-2">
+                    <span class="status-text text-xs text-muted-foreground mr-1">Waiting</span>
+                    <div class="loading-spinner w-4 h-4 hidden">
                         <svg class="animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -751,15 +1073,36 @@
                     <svg class="check-icon w-4 h-4 text-success hidden" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                         <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
                     </svg>
+                    <svg class="warning-icon w-4 h-4 text-warning hidden" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                    </svg>
+                    <a href="#" class="action-button hidden text-xs btn" data-link="${link}">&nbsp;</a>
                 </span>
             </div>`;
         });
+
+        // Add explanation about manual action requirement
+        const explanationNote = `
+        <div class="mb-3 text-xs text-foreground">
+            <div class="flex items-center mb-2 text-sm">
+                <svg class="check-icon w-4 h-4 text-success mr-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                </svg>
+                <span>Automatic Unsubscribe</span>
+            </div>
+            <div class="flex items-center text-sm">
+                <svg class="warning-icon w-4 h-4 text-warning mr-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                </svg>
+                <span>Manual Action Required</span>
+            </div>
+        </div>`;
 
         const progressModalHtml = `
         <div class="bg-background rounded-lg p-6">
             <div class="mb-4 text-center">
                 <h3 class="text-xl font-semibold text-foreground">Unsubscribing...</h3>
-                <p class="text-sm text-muted-foreground mt-2">Sending unsubscribe requests for selected emails.</p>
+                <p class="text-sm text-muted-foreground mt-2">Processing unsubscribe requests for selected emails.</p>
             </div>
             
             <div class="relative pt-1 mb-4">
@@ -771,6 +1114,8 @@
                     <span id="progress-percentage">0%</span>
                 </div>
             </div>
+            
+            ${explanationNote}
             
             <div class="max-h-60 overflow-y-auto border border-border rounded-md p-2">
                 <div id="sender-progress-list">
@@ -785,6 +1130,9 @@
         if (senders.length > 0) {
             updateSenderStatus(senders[0], 'processing');
         }
+        
+        // Return the link maps for use in processing
+        return { httpLinks, mailtoLinks };
     }
     
     function updateProgress(completedCount) {
@@ -836,17 +1184,21 @@
         return senderMap;
     }
     
-    function updateSenderStatus(sender, status) {
+    function updateSenderStatus(sender, status, linkType = null) {
         const senderItem = document.querySelector(`.sender-progress-item[data-sender="${sender}"]`);
         if (!senderItem) return;
         
         const statusText = senderItem.querySelector('.status-text');
         const spinner = senderItem.querySelector('.loading-spinner');
         const checkIcon = senderItem.querySelector('.check-icon');
+        const warningIcon = senderItem.querySelector('.warning-icon');
+        const actionButton = senderItem.querySelector('.action-button');
         
         // Reset all indicators
         spinner.classList.add('hidden');
         checkIcon.classList.add('hidden');
+        warningIcon?.classList.add('hidden');
+        if (actionButton) actionButton.classList.add('hidden');
         
         if (status === 'waiting') {
             if (statusText) statusText.innerText = 'Waiting';
@@ -856,6 +1208,22 @@
         } else if (status === 'completed') {
             if (statusText) statusText.innerText = 'Completed';
             checkIcon.classList.remove('hidden');
+        } else if (status === 'manual') {
+            if (statusText) statusText.innerText = 'Manual Action Required';
+            if (warningIcon) warningIcon.classList.remove('hidden');
+            if (actionButton) {
+                actionButton.classList.remove('hidden');
+                // If we stored the link with the button, set it to be openable
+                if (actionButton.dataset.link && linkType) {
+                    actionButton.href = actionButton.dataset.link;
+                    actionButton.target = "_blank";
+                    actionButton.classList.add('btn-sm', 'btn-outline-warning');
+                    actionButton.textContent = linkType === 'mailto' ? 'Send Email' : 'Open Link';
+                }
+            }
+        } else if (status === 'error') {
+            if (statusText) statusText.innerText = 'Failed';
+            if (warningIcon) warningIcon.classList.remove('hidden');
         }
     }
 
@@ -977,6 +1345,8 @@
         // Get the list of senders that were processed
         let senders = [];
         let processedEmailIds = [];
+        let manualLinks = {};
+        let manualCount = 0;
         
         // First try to use the backend-provided processed senders list
         if (resultData && resultData.details) {
@@ -991,6 +1361,15 @@
                 console.log(`Found ${processedEmailIds.length} processed email IDs from backend data`);
                 // Update the window.processedEmailIds to ensure we only remove properly processed emails
                 window.processedEmailIds = processedEmailIds;
+            }
+            
+            // Get manual links if available
+            if (resultData.details.manual_links) {
+                manualLinks = resultData.details.manual_links;
+            }
+            
+            if (resultData.details.manual_count) {
+                manualCount = resultData.details.manual_count;
             }
         }
         
@@ -1008,49 +1387,132 @@
             const displayedSenders = senders.slice(0, maxSendersToShow);
             const remainingSenders = senders.length - maxSendersToShow;
             
-            let sendersList = displayedSenders.map(sender => 
-                `<li class="text-sm text-foreground py-1 flex items-center">
-                    <svg class="w-4 h-4 text-success mr-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
-                    </svg>
-                    <span class="truncate max-w-[300px]" title="${sender}">${sender}</span>
-                </li>`
-            ).join('');
+            let sendersList = displayedSenders.map(sender => {
+                // Check if this sender requires manual action
+                const requiresManual = manualLinks && manualLinks[sender];
+                
+                return `<li class="text-sm text-foreground py-1 flex items-center justify-between">
+                    <div class="flex items-center">
+                        ${requiresManual ? 
+                            `<svg class="w-4 h-4 text-warning mr-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                            </svg>` : 
+                            `<svg class="w-4 h-4 text-success mr-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                            </svg>`
+                        }
+                        <span class="truncate max-w-[200px]" title="${sender}">${sender}</span>
+                    </div>
+                    ${requiresManual && manualLinks[sender] ? 
+                        `<a href="${manualLinks[sender]}" target="_blank" class="text-xs text-brand hover:underline ml-2">${manualLinks[sender].startsWith('mailto:') ? 'Email' : 'Link'}</a>` : 
+                        ''
+                    }
+                </li>`;
+            }).join('');
             
             if (remainingSenders > 0) {
                 sendersList += `<li class="text-sm text-muted-foreground py-1">And ${remainingSenders} more sender${remainingSenders > 1 ? 's' : ''}...</li>`;
             }
             
+            const summaryTitle = manualCount > 0 ? 
+                "Processed senders (⚠️ some require manual action):" : 
+                "Processed senders:";
+            
             senderSummary = `
             <div class="mt-4 text-left w-full">
-                <h4 class="text-sm font-medium text-foreground mb-1">Processed senders:</h4>
-                <ul class="border border-border rounded-md p-2 max-h-40 overflow-y-auto">
+                <h4 class="text-sm font-medium text-foreground mb-1">${summaryTitle}</h4>
+                <ul class="border border-border rounded-md p-2 max-h-60 overflow-y-auto">
                     ${sendersList}
                 </ul>
             </div>`;
         }
         
-        // Include http_link if provided
-        let linkHtml = '';
-        if (http_link) {
-            linkHtml = `<p class="text-sm mt-2 text-muted-foreground">If needed, you can <a href="${http_link}" target="_blank" class="text-brand hover:underline focus-ring">visit the link manually</a>.</p>`;
+        // Include manual action section if needed
+        let manualActionSection = '';
+        
+        if (manualCount > 0) {
+            // Count manual links types
+            const httpLinkCount = Object.values(manualLinks).filter(link => link.startsWith('http')).length;
+            const mailtoLinkCount = Object.values(manualLinks).filter(link => link.startsWith('mailto')).length;
+            
+            manualActionSection = `
+            <div class="mt-4 p-4 border border-warning rounded-md bg-warning/5 text-sm w-full">
+                <div class="flex items-start">
+                    <svg class="w-5 h-5 text-warning mr-2 mt-0.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                    </svg>
+                    <div>
+                        <h4 class="font-medium text-warning-foreground mb-1">Manual Action Required</h4>
+                        <p class="mb-3 text-muted-foreground">Some unsubscribe requests couldn't be processed automatically. Please use the links above to complete the unsubscription.</p>
+                        <div class="flex flex-wrap gap-2 text-xs">
+                            ${httpLinkCount > 0 ? 
+                                `<span class="inline-flex items-center px-2 py-1 rounded-full bg-warning/10 text-warning-foreground">
+                                    <svg class="w-3 h-3 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" />
+                                    </svg>
+                                    ${httpLinkCount} Web Link${httpLinkCount !== 1 ? 's' : ''}
+                                </span>` : ''
+                            }
+                            ${mailtoLinkCount > 0 ? 
+                                `<span class="inline-flex items-center px-2 py-1 rounded-full bg-warning/10 text-warning-foreground">
+                                    <svg class="w-3 h-3 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                    </svg>
+                                    ${mailtoLinkCount} Email Link${mailtoLinkCount !== 1 ? 's' : ''}
+                                </span>` : ''
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>`;
         }
         
+        // Include main http_link for backwards compatibility
+        let linkHtml = '';
+        if (http_link && manualCount === 0) {
+            linkHtml = `
+            <div class="mt-3 p-3 border border-brand rounded-md bg-brand/5 text-sm">
+                <p class="mb-2"><strong>Important:</strong> Some websites might require you to visit their unsubscribe page directly.</p>
+                <a href="${http_link}" target="_blank" class="btn btn-sm btn-outline w-full focus-ring">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                    Open Unsubscribe Link
+                </a>
+            </div>`;
+        }
+        
+        // Determine what icon to show in the header
+        const iconHtml = manualCount > 0 ? 
+            `<div class="warning-container mb-4">
+                <svg class="warning-large" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52" fill="none" stroke="#ffcc00" stroke-width="2">
+                    <circle cx="26" cy="26" r="24" fill="none"/>
+                    <path d="M26 15v15" stroke-linecap="round"/>
+                    <circle cx="26" cy="37" r="2" fill="#ffcc00"/>
+                </svg>
+            </div>` :
+            `<div class="checkmark-container mb-4">
+                <svg class="checkmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52">
+                    <circle class="checkmark-circle" cx="26" cy="26" r="25" fill="none"/>
+                    <path class="checkmark-check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
+                </svg>
+            </div>`;
+        
+        const titleHtml = manualCount > 0 ? 
+            `<h3 class="text-xl font-semibold text-warning mb-2">Action Required</h3>` :
+            `<h3 class="text-xl font-semibold text-success mb-2">Success!</h3>`;
+            
         return `
         <div class="bg-background rounded-lg p-6 flex flex-col items-center">
-            <div class="text-center">
-                <div class="checkmark-container mb-4">
-                    <svg class="checkmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52">
-                        <circle class="checkmark-circle" cx="26" cy="26" r="25" fill="none"/>
-                        <path class="checkmark-check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
-                    </svg>
-                </div>
-                <h3 class="text-xl font-semibold text-success mb-2">Success!</h3>
+            <div class="text-center flex flex-col items-center">
+                ${iconHtml}
+                ${titleHtml}
                 <p class="text-foreground">${message || "Operation completed successfully."}</p>
                 ${linkHtml}
             </div>
             
             ${senderSummary}
+            ${manualActionSection}
             
             <button 
                 class="mt-6 btn btn-primary btn-md focus-ring w-full"

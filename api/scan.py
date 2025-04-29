@@ -363,7 +363,8 @@ def scan_emails():
 
 @scan_bp.route('/unsubscribe', methods=['POST'])
 def unsubscribe_and_archive():
-    """Handles the unsubscribe action from the form (visiting link/sending email). Now returns JSON."""
+    """Handles the unsubscribe action from the form. 
+    Optimized to focus on mailto links only, as HTTP links are handled client-side."""
     service = utils.get_gmail_service()
     if not service:
         return jsonify({"success": False, "error": "Authentication required. Please refresh and log in again."}), 401
@@ -375,256 +376,181 @@ def unsubscribe_and_archive():
     if not email_ids:
         return jsonify({"success": False, "error": "Missing email IDs."}), 400
         
-    print(f"--- UNSUBSCRIBE ACTION for IDs: {email_ids}, Archive: {should_archive} ---")
+    print(f"--- UNSUBSCRIBE ACTION for {len(email_ids)} emails, Archive: {should_archive} ---")
     
-    # We only need to process ONE unsubscribe action per SENDER.
-    # Fetch details for the first email ID of each sender represented in the list.
+    # We'll process unsubscribe actions per sender to avoid duplicates
     processed_senders = set()
     unsubscribe_actions = [] # List of tuples: (email_id, link_type, link, sender)
     emails_to_archive = set(email_ids) if should_archive else set()
     
-    # Log the start of processing for debugging
-    print(f"Starting to process {len(email_ids)} emails for unsubscription/archiving")
+    # Map to store email IDs by sender
+    sender_email_map = {}
     
-    # Batch fetch minimal details for all selected emails to group by sender efficiently
-    sender_map = {}
-    for msg_id in email_ids:
-        try:
-            # Fetch only From header initially
-            full_message = service.users().messages().get(userId='me', id=msg_id, format='metadata', metadataHeaders=['From']).execute()
-            headers = full_message.get('payload', {}).get('headers', [])
-            sender_raw = next((h['value'] for h in headers if h['name'].lower() == 'from'), None)
-            if sender_raw:
-                 # Extract email address for more reliable grouping
-                sender_email = None
-                if '<' in sender_raw and '>' in sender_raw:
-                    start = sender_raw.find('<') + 1
-                    end = sender_raw.find('>')
-                    if start < end: sender_email = sender_raw[start:end]
-                
-                # Fallback if email isn't in <>
-                if not sender_email:
-                    # Basic check if it looks like an email address
-                    if '@' in sender_raw:
-                         sender_email = sender_raw.strip()
-                
-                # Use raw sender if email extraction fails
-                grouping_key = sender_email if sender_email else sender_raw
-                
-                if grouping_key not in sender_map:
-                    sender_map[grouping_key] = {"name": sender_raw, "first_email_id": msg_id}
-        except Exception as e:
-            print(f"Warning: Failed to fetch initial details for {msg_id}: {e}")
-            # Can't group this one, might cause issues later if it was the only one for a sender
-
-    # Now, for each unique sender, fetch full details for the *first* email to get the link
-    for sender_key, sender_data in sender_map.items():
-        if sender_key in processed_senders:
-            continue
+    # Step 1: First pass to organize emails by sender
+    print(f"Organizing {len(email_ids)} emails by sender")
+    
+    # Process in batches to reduce API calls - batch size of 10
+    batch_size = 10
+    for i in range(0, len(email_ids), batch_size):
+        batch_ids = email_ids[i:i+batch_size]
         
-        first_email_id = sender_data["first_email_id"]
-        sender_name = sender_data["name"]
+        for msg_id in batch_ids:
+            try:
+                # Get minimal metadata - just the From header
+                full_message = service.users().messages().get(
+                    userId='me', 
+                    id=msg_id, 
+                    format='metadata', 
+                    metadataHeaders=['From']
+                ).execute()
+                
+                headers = full_message.get('payload', {}).get('headers', [])
+                sender_raw = next((h['value'] for h in headers if h['name'].lower() == 'from'), 'Unknown Sender')
+                
+                # Clean up sender name for grouping and display
+                if '<' in sender_raw and '>' in sender_raw:
+                    display_sender = sender_raw[:sender_raw.find('<')].strip().replace('"', '')
+                    if not display_sender:
+                        # Use email part if name is empty
+                        email_part = sender_raw[sender_raw.find('<')+1:sender_raw.find('>')]
+                        display_sender = email_part if email_part else sender_raw
+                else:
+                    display_sender = sender_raw
+                
+                # Store this email ID under its sender
+                if display_sender not in sender_email_map:
+                    sender_email_map[display_sender] = []
+                
+                sender_email_map[display_sender].append(msg_id)
+                
+            except Exception as e:
+                print(f"Error getting sender for email {msg_id}: {e}")
+    
+    # Step 2: Find unsubscribe links from the first email for each sender
+    print(f"Found {len(sender_email_map)} unique senders")
+    
+    for sender, sender_email_ids in sender_email_map.items():
+        if not sender_email_ids:
+            continue
+            
+        # Use the first email from this sender to check for unsubscribe link
+        first_email_id = sender_email_ids[0]
+        
         try:
+            # Get unsubscribe headers for this email
             full_message = service.users().messages().get(
-                userId='me', id=first_email_id, 
+                userId='me', 
+                id=first_email_id, 
                 format='metadata', 
                 metadataHeaders=[
-                    'List-Unsubscribe', 'X-List-Unsubscribe', 'List-Unsubscribe-Post', 
-                    'From', 'List-Id', 'Feedback-ID'
-                ]).execute()
+                    'List-Unsubscribe', 'X-List-Unsubscribe', 'List-Unsubscribe-Post'
+                ]
+            ).execute()
+            
             link, link_type = find_unsubscribe_links(full_message)
-            if link and link_type:
-                # Clean up sender name for display
-                if '<' in sender_name and '>' in sender_name:
-                    display_sender = sender_name[:sender_name.find('<')].strip().replace('"', '') or sender_name
-                else: display_sender = sender_name
-                unsubscribe_actions.append((first_email_id, link_type, link, display_sender))
-                processed_senders.add(sender_key)
-            else:
-                print(f"No unsubscribe link found for sender {sender_key} (using email {first_email_id})")
-        except Exception as fetch_err:
-            print(f"Error fetching full details for {first_email_id} (Sender: {sender_key}): {fetch_err}")
-
-    # --- Perform Unsubscribe Actions ---
+            
+            # We're only interested in mailto links here, as HTTP links are handled client-side
+            if link and link_type == 'header_mailto':
+                unsubscribe_actions.append((first_email_id, link_type, link, sender))
+                
+        except Exception as e:
+            print(f"Error finding unsubscribe link for sender {sender} (email {first_email_id}): {e}")
+    
+    # Step 3: Process mailto unsubscribe links
+    print(f"Processing {len(unsubscribe_actions)} mailto unsubscribe actions")
+    
     success_count = 0
     fail_count = 0
     errors = []
-    http_link_for_modal = None # Store the last HTTP link for potential manual visit
-    successfully_processed_ids = [] # Store successfully processed email IDs
-
-    # Log total unsubscribe actions to perform
-    print(f"Processing {len(unsubscribe_actions)} unsubscribe actions for unique senders")
+    successfully_processed_ids = []
     
-    # Map to track which sender's emails should be considered processed 
+    # Track which senders were successfully processed
     processed_sender_map = {}
     
     for idx, (msg_id, link_type, link, sender) in enumerate(unsubscribe_actions):
         try:
-            # Log progress for each sender (useful for debugging and monitoring)
-            print(f"[{idx+1}/{len(unsubscribe_actions)}] Processing unsubscribe for {sender} via {link_type}")
+            print(f"Processing mailto link for {sender}: {link}")
             
-            if link_type == 'header_http':
-                # We don't actually visit the link client-side did this
-                # Store it in case user needs it
-                http_link_for_modal = link 
-                print(f"  - (HTTP link for {sender}: {link})")
-                # Mark as success (assuming client-side fetch worked)
-                success_count += 1
-                
-                # Track this sender as successfully processed
-                if sender not in processed_sender_map:
-                    processed_sender_map[sender] = True
-                
-                # Add this email ID to successfully processed list
-                successfully_processed_ids.append(msg_id)
-                
-            elif link_type == 'header_mailto':
-                # Parse and send mailto
-                parsed_mailto = urlparse(link)
-                to_address = parsed_mailto.path
-                params = parse_qs(parsed_mailto.query)
-                subject = params.get('subject', ['Unsubscribe'])[0]
-                body = params.get('body', ['Please unsubscribe me.'])[0]
-                
-                if not to_address: raise ValueError("Mailto link missing recipient.")
-                
-                message = MIMEText(body)
-                message['to'] = to_address
-                message['subject'] = subject
-                raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
-                send_message_body = {'raw': raw_message}
-                
-                if MOCK_API:
-                    print(f"  - MOCK SEND EMAIL to {to_address} for {sender}")
-                else:
-                    service.users().messages().send(userId='me', body=send_message_body).execute()
-                    print(f"  - Sent mailto for {sender}")
-                success_count += 1
-                
-                # Track this sender as successfully processed
-                if sender not in processed_sender_map:
-                    processed_sender_map[sender] = True
-                
-                # Add this email ID to successfully processed list
-                successfully_processed_ids.append(msg_id)
+            # Parse and send mailto
+            parsed_mailto = urlparse(link)
+            to_address = parsed_mailto.path
+            params = parse_qs(parsed_mailto.query)
+            subject = params.get('subject', ['Unsubscribe'])[0]
+            body = params.get('body', ['Please unsubscribe me.'])[0]
             
-            # Log successful completion
-            print(f"  ✓ Successfully processed unsubscribe for {sender}")
+            if not to_address:
+                raise ValueError("Mailto link missing recipient.")
+            
+            message = MIMEText(body)
+            message['to'] = to_address
+            message['subject'] = subject
+            raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
+            send_message_body = {'raw': raw_message}
+            
+            if MOCK_API:
+                print(f"MOCK SEND EMAIL to {to_address} for {sender}")
+            else:
+                service.users().messages().send(userId='me', body=send_message_body).execute()
+                print(f"Sent mailto for {sender}")
+            
+            success_count += 1
+            processed_sender_map[sender] = True
+            
+            # All emails from this sender are considered processed
+            sender_emails = sender_email_map.get(sender, [])
+            successfully_processed_ids.extend(sender_emails)
             
         except Exception as e:
             fail_count += 1
             error_detail = f"Failed to process unsubscribe for {sender}: {e}"
-            print(f"!!! ERROR: {error_detail} !!!")
+            print(f"ERROR: {error_detail}")
             errors.append(error_detail)
-            
-            # Mark this sender as failed
-            if sender not in processed_sender_map:
-                processed_sender_map[sender] = False
-
-    # Now find all other emails from successfully processed senders
-    all_processed_ids = set(successfully_processed_ids)
-    for email_id in email_ids:
-        # Skip if already in our successfully processed list
-        if email_id in all_processed_ids:
-            continue
-            
-        try:
-            # Get sender for this email
-            full_message = service.users().messages().get(userId='me', id=email_id, format='metadata', metadataHeaders=['From']).execute()
-            headers = full_message.get('payload', {}).get('headers', [])
-            sender_raw = next((h['value'] for h in headers if h['name'].lower() == 'from'), None)
-            
-            if sender_raw:
-                # Clean sender name for comparison
-                if '<' in sender_raw and '>' in sender_raw:
-                    display_sender = sender_raw[:sender_raw.find('<')].strip().replace('"', '') or sender_raw
-                else:
-                    display_sender = sender_raw
-                
-                # If this email is from a successfully processed sender, add it to our list
-                if display_sender in processed_sender_map and processed_sender_map[display_sender]:
-                    print(f"Adding email {email_id} to processed list - from sender {display_sender}")
-                    all_processed_ids.add(email_id)
-        except Exception as e:
-            print(f"Error getting sender for email {email_id}: {e}")
-            
-    # Convert back to list for further processing
-    successfully_processed_ids = list(all_processed_ids)
-
-    # --- Archive Emails (if requested) ---
-    archive_success_count = 0
-    archive_fail_count = 0
-    archive_errors = []
-    if should_archive and emails_to_archive:
-        print(f"Archiving {len(emails_to_archive)} emails...")
-        for msg_id in emails_to_archive:
-            try:
-                service.users().messages().modify(userId='me', id=msg_id, body={'removeLabelIds': ['INBOX']}).execute()
-                archive_success_count += 1
-                
-                # Add successfully archived email to our list if not already there
-                if msg_id not in all_processed_ids:
-                    successfully_processed_ids.append(msg_id)
-                    
-            except Exception as e:
-                archive_fail_count += 1
-                error_detail = f"Failed to archive {msg_id}: {e}"
-                print(f"!!! ERROR: {error_detail} !!!")
-                archive_errors.append(error_detail)
-        print(f"Archiving finished. Success: {archive_success_count}, Fail: {archive_fail_count}")
-
-    # --- Construct Response --- 
-    overall_success = fail_count == 0 and archive_fail_count == 0
+            processed_sender_map[sender] = False
+    
+    # Step 4: Archive emails if requested (now handled client-side in a separate request)
+    # Batch archive is now done in a separate endpoint call to optimize cloud function usage
+    
+    # Construct response
+    overall_success = fail_count == 0
+    
     message_parts = []
     if success_count > 0:
-        message_parts.append(f"Processed {success_count} unsubscribe action{ 's' if success_count != 1 else '' }.")
+        message_parts.append(f"Processed {success_count} mailto unsubscribe action{'s' if success_count != 1 else ''}.")
     if fail_count > 0:
-         message_parts.append(f"{fail_count} unsubscribe action{ 's' if fail_count != 1 else '' } failed.")
-    if should_archive:
-         if archive_success_count > 0:
-             message_parts.append(f"Archived {archive_success_count} email{ 's' if archive_success_count != 1 else '' }.")
-         if archive_fail_count > 0:
-            message_parts.append(f"{archive_fail_count} email{ 's' if archive_fail_count != 1 else '' } failed to archive.")
-    elif not should_archive and emails_to_archive: # Explicitly state if archive was off
-         message_parts.append("Archiving was disabled.")
-
+        message_parts.append(f"{fail_count} mailto unsubscribe action{'s' if fail_count != 1 else ''} failed.")
+    
     final_message = " ".join(message_parts) if message_parts else "No actions performed."
     
-    # Extract processed sender details for frontend display
-    processed_senders = []
-    for msg_id, link_type, link, sender in unsubscribe_actions:
-        if processed_sender_map.get(sender, False) and sender not in processed_senders:
-            processed_senders.append(sender)
-
-    print(f"Successfully processed {len(successfully_processed_ids)} emails")
+    # Get unique list of successfully processed senders
+    processed_senders = [
+        sender for sender, success in processed_sender_map.items() if success
+    ]
+    
+    print(f"Successfully processed {len(successfully_processed_ids)} emails via mailto links")
     
     response_data = {
         "success": overall_success,
         "message": final_message,
         "details": {
             "unsubscribe_errors": errors,
-            "archive_errors": archive_errors,
-            "processed_senders": processed_senders,  # Add processed senders to the response
-            "processed_email_ids": successfully_processed_ids  # Add list of processed email IDs
+            "processed_senders": processed_senders,
+            "processed_email_ids": successfully_processed_ids
         },
-        # Provide the last HTTP link in case manual action is needed
-        "http_link": http_link_for_modal if http_link_for_modal else None # Show link even on success
+        "http_link": None  # No HTTP link needed here as they're handled client-side
     }
 
     status_code = 200 if overall_success else 500 # Use 500 if any part failed
     return jsonify(response_data), status_code
 
-# --- New Route for Archiving --- 
+# --- Optimized Route for Batch Archiving --- 
 @scan_bp.route('/archive', methods=['POST'])
 def archive_emails():
-    """Archives a list of emails provided by message IDs. Returns JSON."""
-    print("--- ARCHIVE ROUTE START ---")
+    """Archives a list of emails in batches for better performance. Returns JSON."""
+    print("--- BATCH ARCHIVE ROUTE START ---")
     service = utils.get_gmail_service()
     if not service:
-         # Return JSON error for AJAX
         return jsonify({"success": False, "error": "Authentication required."}), 401
 
-    # Expect form data now, not JSON
     message_ids = request.form.getlist('email_ids') 
     if not message_ids:
         print("Archive route: Missing email_ids in form data")
@@ -640,40 +566,84 @@ def archive_emails():
     success_count = 0
     fail_count = 0
     errors = []
-
-    for msg_id in message_ids:
-        try:
-            # print(f"Attempting to archive {msg_id}")
-            if MOCK_API:
-                print(f"--- MOCK ARCHIVE EMAIL ID: {msg_id} ---")
+    
+    # Process in batches to reduce API calls
+    batch_size = 50 # Gmail API can handle larger batches
+    
+    for i in range(0, len(message_ids), batch_size):
+        batch = message_ids[i:i+batch_size]
+        batch_ids = []
+        
+        print(f"Processing archive batch {i//batch_size + 1} with {len(batch)} emails")
+        
+        # Validate the IDs in this batch
+        for msg_id in batch:
+            if msg_id and msg_id.strip():  # Check for valid non-empty IDs
+                batch_ids.append(msg_id.strip())
             else:
-                service.users().messages().modify(
+                print(f"Skipping invalid empty ID")
+        
+        if not batch_ids:
+            print("No valid IDs in this batch, skipping")
+            continue
+            
+        try:
+            if MOCK_API:
+                print(f"MOCK BATCH ARCHIVE: {len(batch_ids)} emails")
+                success_count += len(batch_ids)
+            else:
+                # Use batch modification for better performance
+                # The Gmail API supports modifying multiple messages in a single request
+                service.users().messages().batchModify(
                     userId='me',
-                    id=msg_id,
-                    body={'removeLabelIds': ['INBOX']} 
+                    body={
+                        'ids': batch_ids,
+                        'removeLabelIds': ['INBOX']
+                    }
                 ).execute()
-            success_count += 1
+                
+                success_count += len(batch_ids)
+                print(f"Successfully archived batch of {len(batch_ids)} emails")
+                
         except Exception as e:
-            fail_count += 1
-            error_detail = f"Failed to archive {msg_id}: {e}"
-            print(f"!!! ERROR: {error_detail} !!!")
-            errors.append(error_detail)
+            # If batch fails, try individually to identify problematic IDs
+            print(f"Batch archive failed: {e}. Trying individually...")
+            
+            for msg_id in batch_ids:
+                try:
+                    if MOCK_API:
+                        print(f"MOCK ARCHIVE EMAIL ID: {msg_id}")
+                    else:
+                        service.users().messages().modify(
+                            userId='me',
+                            id=msg_id,
+                            body={'removeLabelIds': ['INBOX']}
+                        ).execute()
+                    success_count += 1
+                except Exception as individual_error:
+                    fail_count += 1
+                    error_detail = f"Failed to archive {msg_id}: {individual_error}"
+                    print(f"ERROR: {error_detail}")
+                    errors.append(error_detail)
 
     print(f"Archive route: Finished. Success: {success_count}, Failed: {fail_count}")
+    
     overall_success = fail_count == 0
-    final_message = f"Successfully archived {success_count} email{ 's' if success_count != 1 else '' }."
+    final_message = f"Successfully archived {success_count} email{'s' if success_count != 1 else ''}."
+    
     if fail_count > 0:
-        final_message += f" Failed to archive {fail_count} email{ 's' if fail_count != 1 else '' }."
+        final_message += f" Failed to archive {fail_count} email{'s' if fail_count != 1 else ''}."
     
     response_data = {
         "success": overall_success,
         "message": final_message,
         "details": {
-            "archive_errors": errors
+            "archive_errors": errors,
+            "archived_count": success_count
         }
     }
-    status_code = 200 if overall_success else 500
     
+    status_code = 200 if overall_success else 500
     return jsonify(response_data), status_code
 
-# --- End New Route --- 
+# --- End Optimized Route --- 
