@@ -359,7 +359,13 @@
 <div id="fixed-action-bar" class="fixed bottom-0 left-0 right-0 bg-background border-t border-border shadow-md z-50 hidden">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center">
         <div class="flex items-center space-x-3">
-            <span id="action-count" class="text-sm font-medium text-foreground">0 emails selected</span>
+            <div class="flex flex-col">
+                <span id="action-count" class="text-sm font-medium text-foreground">0 emails selected</span>
+                <div class="w-48 h-1.5 bg-muted rounded-full mt-1">
+                    <div id="email-limit-progress" class="h-full bg-brand rounded-full" style="width: 0%"></div>
+                </div>
+                <span class="text-xs text-muted-foreground mt-0.5"><span id="email-count-current">0</span>/<span id="email-count-max">25</span> emails</span>
+            </div>
             <button type="button" onclick="resetSelection()" class="btn btn-ghost btn-sm text-muted-foreground hover:text-foreground hover:bg-muted focus-ring p-1">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-1"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
                 Reset
@@ -382,6 +388,7 @@
 <script>
     // Colors are now passed from the backend and applied via Jinja
     const storageKey = 'selectedEmailIds'; // Key for sessionStorage
+    const MAX_EMAILS = 25; // Maximum number of emails that can be selected/processed at once
 
     // --- Storage Helper Functions ---
     function getSelectedEmailsFromStorage() {
@@ -484,6 +491,20 @@
         const senderGroup = document.getElementById(`sender-group-${senderId}`);
         const isChecked = senderCheckbox.checked;
 
+        // If trying to select all and would exceed limit, show warning
+        if (isChecked) {
+            const selectedEmailIds = getSelectedEmailsFromStorage();
+            const currentlyChecked = Array.from(emailCheckboxes).filter(cb => cb.checked).length;
+            const toBeAdded = Array.from(emailCheckboxes).filter(cb => !cb.checked).length;
+            
+            if (selectedEmailIds.length + toBeAdded > MAX_EMAILS) {
+                alert(`Selecting all emails from this sender would exceed the maximum limit of ${MAX_EMAILS}. Please select fewer emails.`);
+                senderCheckbox.checked = false;
+                senderCheckbox.indeterminate = currentlyChecked > 0;
+                return;
+            }
+        }
+
         emailCheckboxes.forEach(cb => {
             cb.checked = isChecked;
             const emailRow = document.getElementById(`email-${cb.value}`);
@@ -505,6 +526,13 @@
         
         const emailCheckbox = document.querySelector(`.email-checkbox[value="${emailId}"]`);
         if (emailCheckbox) {
+            // Check if we're trying to select (not deselect) and are at the limit
+            const selectedEmailIds = getSelectedEmailsFromStorage();
+            if (!emailCheckbox.checked && selectedEmailIds.length >= MAX_EMAILS) {
+                alert(`Maximum selection limit reached (${MAX_EMAILS}). Please unselect some emails before selecting more.`);
+                return;
+            }
+            
             emailCheckbox.checked = !emailCheckbox.checked;
             handleEmailCheckboxClick(emailCheckbox);
         }
@@ -616,11 +644,31 @@
         // Get action bar elements
         const actionBar = document.getElementById('fixed-action-bar');
         const actionText = document.getElementById('action-count');
+        const progressBar = document.getElementById('email-limit-progress');
+        const emailCountCurrent = document.getElementById('email-count-current');
+        const emailCountMax = document.getElementById('email-count-max');
         
         if (!actionBar || !actionText) return;
         
         // Update the count text
         actionText.textContent = count === 1 ? '1 email selected' : `${count} emails selected`;
+        
+        // Update progress bar
+        if (progressBar && emailCountCurrent && emailCountMax) {
+            const progressPercent = (count / MAX_EMAILS) * 100;
+            progressBar.style.width = `${progressPercent}%`;
+            emailCountCurrent.textContent = count;
+            emailCountMax.textContent = MAX_EMAILS;
+            
+            // Change progress bar color when approaching limit
+            if (progressPercent >= 90) {
+                progressBar.classList.remove('bg-brand');
+                progressBar.style.backgroundColor = 'rgb(245, 158, 11)'; // Amber-500 color
+            } else {
+                progressBar.style.backgroundColor = ''; // Reset to default
+                progressBar.classList.add('bg-brand');
+            }
+        }
         
         // Toggle visibility based on selection
         if (count > 0) {
@@ -657,8 +705,7 @@
             return;
         }
         
-        // Limit to 25 emails at a time
-        const MAX_EMAILS = 25;
+        // Check against the global MAX_EMAILS constant
         if (selectedIdsFromStorage.length > MAX_EMAILS) {
             alert(`For reliable processing, please limit your selection to ${MAX_EMAILS} emails at a time. Currently ${selectedIdsFromStorage.length} are selected.`);
             return;
