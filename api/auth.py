@@ -89,27 +89,23 @@ def login():
     return_to_url = request.args.get('return_to', request.referrer) # Get return URL from param or referrer
 
     # --- Scope Determination Logic --- #
-    # Check if user already has modify scope, even if not requested
-    already_has_modify = utils.has_modify_scope()
-    if utils.should_log(): print(f"User already has modify scope: {already_has_modify}")
-    
-    # Always start with modify scope if user already has it or if explicitly requested
-    if already_has_modify or requested_scope_type == 'modify':
-        if utils.should_log(): print("Requesting full scopes (modify + readonly) due to existing permissions or explicit request.")
+    # Use only the necessary scopes based on user request
+    if requested_scope_type == 'modify':
+        if utils.should_log(): print("User requested modify scope for archiving capability")
         scopes_for_flow = [
-            'https://www.googleapis.com/auth/gmail.modify',
+            'https://www.googleapis.com/auth/gmail.modify', 
             'https://www.googleapis.com/auth/gmail.readonly'
         ]
-        # Store return URL only if it was an explicit upgrade request
-        if requested_scope_type == 'modify' and return_to_url:
+        # Store return URL for redirecting back after permissions granted
+        if return_to_url:
             session['post_auth_redirect'] = return_to_url
             if utils.should_log(): print(f"Stored post-auth redirect URL: {return_to_url}")
-            flash("Requesting permissions update.", "info") # More generic message
+        flash("Requesting additional permissions for archiving.", "info")
     else:
-        if utils.should_log(): print("Requesting standard read-only scope.")
+        if utils.should_log(): print("Using default read-only scope")
         scopes_for_flow = config.SCOPES.copy()
     # --- End Scope Determination --- #
-
+    
     # Store the scopes we are about to request in the session
     session['oauth_request_scopes'] = scopes_for_flow
     if utils.should_log(): print(f"Stored oauth_request_scopes in session: {scopes_for_flow}")
@@ -126,13 +122,12 @@ def login():
         print(f"[Login Route] Redirect URI: {flow.redirect_uri}")
 
     try:
-        # Always use prompt='consent' to ensure user sees the consent screen,
-        # especially important when scopes change.
-        # include_granted_scopes='true' can be added if desired, but consent is key.
+        # Always use prompt='consent' to ensure user sees the consent screen
+        # This is crucial for handling scope changes
         authorization_url, state = flow.authorization_url(
             access_type='offline', # Request refresh token
-            prompt='consent',
-            include_granted_scopes='true' # Optional: pre-select already granted scopes
+            prompt='consent',  # Force the consent screen every time
+            include_granted_scopes='true'
         )
         session['oauth_state'] = state # Store state for verification in callback
         if utils.should_log():

@@ -1,7 +1,8 @@
 import os
 # Set OAuth environment variables to relax token scope validation
-# os.environ['OAUTHLIB_RELAX_TOKEN_SCOPE'] = 'True'
+os.environ['OAUTHLIB_RELAX_TOKEN_SCOPE'] = 'True'
 os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = 'True'  # For development only
+os.environ['OAUTHLIB_IGNORE_SCOPE_CHANGE'] = 'True'  # Ignore scope changes during auth flow
 
 import pickle
 import base64
