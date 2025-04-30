@@ -171,6 +171,7 @@ The application follows a modern, minimalist design system inspired by ShadCN, R
 4. Redirect to `/oauth2callback` intermediate page (to prevent loops)
 5. Auth callback processes token with proper handling for scope changes
 6. Credentials stored in session
+7. Logout completely clears all session data, cookies, localStorage and sessionStorage
 
 ### Email Scanning Process
 

@@ -259,7 +259,62 @@ def oauth2callback():
 
 @auth_bp.route('/logout')
 def logout():
-    """Clears the session and logs the user out."""
-    utils.clear_credentials() # Use function from utils
-    flash("You have been logged out.", "info")
-    return redirect(url_for('index')) 
+    """Clears the session and logs the user out completely."""
+    # First, clear credentials
+    utils.clear_credentials()
+    
+    # Clear all OAuth-related session data
+    session.pop('oauth_state', None)
+    session.pop('requested_scopes', None)
+    session.pop('requested_extended_permissions', None)
+    session.pop('current_auth_scopes', None)
+    session.pop('return_to_scan_token', None)
+    
+    # Clear any other session data
+    session.clear()
+    
+    # Create a response with cache-control headers to clear browser cache
+    response = redirect(url_for('index'))
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    
+    # Create HTML with logout script to clear browser storage before redirect
+    html = """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Logging out...</title>
+        <script>
+            // Clear all localStorage
+            localStorage.clear();
+            
+            // Clear all sessionStorage
+            sessionStorage.clear();
+            
+            // Clear cookies
+            document.cookie.split(';').forEach(function(c) {
+                document.cookie = c.trim().split('=')[0] + '=;' + 'expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/';
+            });
+            
+            // Show message
+            document.addEventListener('DOMContentLoaded', function() {
+                document.getElementById('message').textContent = 'You have been logged out. Redirecting...';
+            });
+            
+            // Redirect to homepage after a short delay
+            setTimeout(function() {
+                window.location.href = '/';
+            }, 1000);
+        </script>
+    </head>
+    <body style="font-family: Arial, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background-color: #f5f5f5;">
+        <div style="text-align: center; padding: 2rem; background: white; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <h2>Logging out</h2>
+            <p id="message">Clearing data...</p>
+        </div>
+    </body>
+    </html>
+    """
+    
+    return html
