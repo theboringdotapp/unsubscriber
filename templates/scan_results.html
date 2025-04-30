@@ -295,7 +295,8 @@
                                 <input type="checkbox" 
                                        id="select-sender-{{ sender_id }}" 
                                        class="sender-checkbox form-checkbox h-4 w-4 text-brand border-border rounded focus:ring-brand" 
-                                       data-sender="{{ clean_sender|e }}">
+                                       data-sender="{{ clean_sender|e }}"
+                                       onclick="event.stopPropagation();">
                                 <label class="sender-name ml-2">{{ clean_sender }} ({{ data.emails|length }})</label>
                                 {% if data.unsubscribe_link %}
                                 <span class="tooltip-container">
@@ -762,6 +763,12 @@
         
         // Update action bar with count
         updateActionBar();
+    }
+
+    function handleSenderCheckboxClick(checkbox, senderId) {
+        // Since we're stopping propagation, we need to manually trigger the select all function
+        // No need to toggle the checkbox state as the browser will do that automatically
+        selectAllSenderEmails(checkbox, senderId);
     }
 
     function updateSenderCheckboxState(emailCheckbox) {
