@@ -94,7 +94,7 @@ def index():
     # Use get_gmail_service from utils
     service = utils.get_gmail_service()
     authenticated = bool(service)
-    print(f"Index route: authenticated={authenticated}")
+    if config.DEBUG_LOGGING: print(f"Index route: authenticated={authenticated}")
     return render_template('index.html', authenticated=authenticated)
 
 @app.route('/privacy')

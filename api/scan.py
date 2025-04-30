@@ -216,7 +216,7 @@ def scan_emails():
     service = utils.get_gmail_service()
     if not service:
         flash("Authentication required.", "warning")
-        print("Scan route: Not authenticated.")
+        if config.DEBUG_LOGGING: print("Scan route: Not authenticated.")
         return redirect(url_for('auth.login')) # Redirect to auth blueprint login
     
     authenticated = True 
@@ -240,7 +240,7 @@ def scan_emails():
     ]
 
     try:
-        print("Fetching email page.")
+        if config.DEBUG_LOGGING: print("Fetching email page.")
         max_scan_emails = config.MAX_SCAN_EMAILS # Get constant from config
 
         if MOCK_API:
@@ -333,7 +333,7 @@ def scan_emails():
 
         next_page_token = list_response.get('nextPageToken')
         if config.DEBUG_LOGGING: print(f"--- SCAN ROUTE: Next page token from API: {next_page_token} ---")
-        print(f"Scan finished for this page. Found {len(found_subscriptions)} unique senders on this page.")
+        if config.DEBUG_LOGGING: print(f"Scan finished for this page. Found {len(found_subscriptions)} unique senders on this page.")
 
     except Exception as e:
         flash(f"An error occurred during email scan: {e}", "error")
@@ -388,7 +388,7 @@ def unsubscribe_and_archive():
     sender_email_map = {}
     
     # Step 1: First pass to organize emails by sender
-    print(f"Organizing {len(email_ids)} emails by sender")
+    if config.DEBUG_LOGGING: print(f"Organizing {len(email_ids)} emails by sender")
     
     # Process in batches to reduce API calls - batch size of 10
     batch_size = 10
@@ -428,7 +428,7 @@ def unsubscribe_and_archive():
                 print(f"Error getting sender for email {msg_id}: {e}")
     
     # Step 2: Find unsubscribe links from the first email for each sender
-    print(f"Found {len(sender_email_map)} unique senders")
+    if config.DEBUG_LOGGING: print(f"Found {len(sender_email_map)} unique senders")
     
     for sender, sender_email_ids in sender_email_map.items():
         if not sender_email_ids:
@@ -459,7 +459,7 @@ def unsubscribe_and_archive():
     
     # We no longer process mailto links automatically
     # Instead we'll save them for the user to handle manually
-    print(f"Found {len(unsubscribe_actions)} mailto unsubscribe links")
+    if config.DEBUG_LOGGING: print(f"Found {len(unsubscribe_actions)} mailto unsubscribe links")
     
     # We'll collect these links to display to the user in the UI
     # No automatic processing is done with the readonly scope
@@ -467,7 +467,7 @@ def unsubscribe_and_archive():
     
     for idx, (msg_id, link_type, link, sender) in enumerate(unsubscribe_actions):
         try:
-            print(f"Found mailto link for {sender}: {link}")
+            if config.DEBUG_LOGGING: print(f"Found mailto link for {sender}: {link}")
             
             # Parse mailto to get details to show to the user
             parsed_mailto = urlparse(link)
@@ -568,7 +568,7 @@ def archive_emails():
                     archive_errors.append(f"Error adding message {msg_id} to batch: {e}")
             
             # Execute the batch request
-            print(f"Executing batch archive for {len(email_ids)} emails...")
+            if config.DEBUG_LOGGING: print(f"Executing batch archive for {len(email_ids)} emails...")
             batch.execute()
             
             response_data = {

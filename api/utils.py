@@ -48,7 +48,7 @@ def load_credentials():
 def clear_credentials():
      """Clears credentials from the session."""
      session.pop('credentials', None)
-     print("Cleared credentials from session.")
+     if config.DEBUG_LOGGING: print("Cleared credentials from session.")
 
 # --- End Token Handling Modification ---
 

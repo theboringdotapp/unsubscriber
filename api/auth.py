@@ -19,11 +19,11 @@ def get_google_auth_flow(scopes_list=None):
     Falls back to loading from CREDENTIALS_FILE if the env var is not set.
     Uses provided scopes or SCOPES from config as fallback.
     """
-    print("--- GET_GOOGLE_AUTH_FLOW START ---")
+    if config.DEBUG_LOGGING: print("--- GET_GOOGLE_AUTH_FLOW START ---")
 
     # Use provided scopes or fallback to config scopes
     scopes_to_use = scopes_list if scopes_list else config.SCOPES
-    print(f"Using scopes: {scopes_to_use}")
+    if config.DEBUG_LOGGING: print(f"Using scopes: {scopes_to_use}")
     
     redirect_uri = config.REDIRECT_URI
     credentials_file = config.CREDENTIALS_FILE
@@ -31,7 +31,7 @@ def get_google_auth_flow(scopes_list=None):
     credentials_json_content = os.environ.get('GOOGLE_CREDENTIALS_JSON')
 
     if credentials_json_content:
-        print("Loading credentials from GOOGLE_CREDENTIALS_JSON environment variable.")
+        if config.DEBUG_LOGGING: print("Loading credentials from GOOGLE_CREDENTIALS_JSON environment variable.")
         try:
             client_config = json.loads(credentials_json_content)
             if 'web' not in client_config and 'installed' not in client_config:
@@ -42,8 +42,8 @@ def get_google_auth_flow(scopes_list=None):
                 client_config,
                 scopes=scopes_to_use,
                 redirect_uri=redirect_uri)
-            print("Successfully created Flow object from environment variable.")
-            print("--- GET_GOOGLE_AUTH_FLOW END ---")
+            if config.DEBUG_LOGGING: print("Successfully created Flow object from environment variable.")
+            if config.DEBUG_LOGGING: print("--- GET_GOOGLE_AUTH_FLOW END ---")
             return flow
         except json.JSONDecodeError as e:
              print(f"!!! ERROR: Failed to parse JSON from GOOGLE_CREDENTIALS_JSON: {e} !!!")
@@ -52,11 +52,11 @@ def get_google_auth_flow(scopes_list=None):
             print(f"!!! ERROR creating Flow from environment variable config: {e} !!!")
             return None
     else:
-        print("GOOGLE_CREDENTIALS_JSON not found. Falling back to credentials file.")
+        if config.DEBUG_LOGGING: print("GOOGLE_CREDENTIALS_JSON not found. Falling back to credentials file.")
         # Construct path relative to project root
         project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) # api -> project root
         abs_credentials_file = os.path.join(project_root, credentials_file) 
-        print(f"Attempting to load credentials from file: {abs_credentials_file}")
+        if config.DEBUG_LOGGING: print(f"Attempting to load credentials from file: {abs_credentials_file}")
 
         if not os.path.exists(abs_credentials_file):
             print(f"!!! ERROR: {abs_credentials_file} not found! Ensure '{credentials_file}' is in the project root OR set GOOGLE_CREDENTIALS_JSON env var. !!!")
@@ -68,8 +68,8 @@ def get_google_auth_flow(scopes_list=None):
                 abs_credentials_file,
                 scopes=scopes_to_use,
                 redirect_uri=redirect_uri)
-            print(f"Successfully created Flow object from file.")
-            print("--- GET_GOOGLE_AUTH_FLOW END ---")
+            if config.DEBUG_LOGGING: print(f"Successfully created Flow object from file.")
+            if config.DEBUG_LOGGING: print("--- GET_GOOGLE_AUTH_FLOW END ---")
             return flow
         except Exception as e:
             print(f"!!! ERROR in get_google_auth_flow loading/parsing {abs_credentials_file}: {e} !!!")
@@ -83,7 +83,7 @@ def login():
     utils.clear_credentials() # Clear any old credentials
     session.pop('oauth_state', None) # Clear old state if any
     session.pop('post_auth_redirect', None) # Clear old redirect target
-    print("Starting login flow...")
+    if config.DEBUG_LOGGING: print("Starting login flow...")
 
     requested_scope_type = request.args.get('scope')
     return_to_url = request.args.get('return_to', request.referrer) # Get return URL from param or referrer
@@ -91,11 +91,11 @@ def login():
     # --- Scope Determination Logic --- #
     # Check if user already has modify scope, even if not requested
     already_has_modify = utils.has_modify_scope()
-    print(f"User already has modify scope: {already_has_modify}")
+    if config.DEBUG_LOGGING: print(f"User already has modify scope: {already_has_modify}")
     
     # Always start with modify scope if user already has it or if explicitly requested
     if already_has_modify or requested_scope_type == 'modify':
-        print("Requesting full scopes (modify + readonly) due to existing permissions or explicit request.")
+        if config.DEBUG_LOGGING: print("Requesting full scopes (modify + readonly) due to existing permissions or explicit request.")
         scopes_for_flow = [
             'https://www.googleapis.com/auth/gmail.modify',
             'https://www.googleapis.com/auth/gmail.readonly'
@@ -103,16 +103,16 @@ def login():
         # Store return URL only if it was an explicit upgrade request
         if requested_scope_type == 'modify' and return_to_url:
             session['post_auth_redirect'] = return_to_url
-            print(f"Stored post-auth redirect URL: {return_to_url}")
+            if config.DEBUG_LOGGING: print(f"Stored post-auth redirect URL: {return_to_url}")
             flash("Requesting permissions update.", "info") # More generic message
     else:
-        print("Requesting standard read-only scope.")
+        if config.DEBUG_LOGGING: print("Requesting standard read-only scope.")
         scopes_for_flow = config.SCOPES.copy()
     # --- End Scope Determination --- #
 
     # Store the scopes we are about to request in the session
     session['oauth_request_scopes'] = scopes_for_flow
-    print(f"Stored oauth_request_scopes in session: {scopes_for_flow}")
+    if config.DEBUG_LOGGING: print(f"Stored oauth_request_scopes in session: {scopes_for_flow}")
     
     # Create flow with the determined scopes
     flow = get_google_auth_flow(scopes_list=scopes_for_flow)
@@ -121,8 +121,9 @@ def login():
         flash("Could not load credentials configuration. Please check server logs.", "error")
         return redirect(url_for('index'))
 
-    print(f"[Login Route] Using Flow with scopes: {scopes_for_flow}")
-    print(f"[Login Route] Redirect URI: {flow.redirect_uri}")
+    if config.DEBUG_LOGGING:
+        print(f"[Login Route] Using Flow with scopes: {scopes_for_flow}")
+        print(f"[Login Route] Redirect URI: {flow.redirect_uri}")
 
     try:
         # Always use prompt='consent' to ensure user sees the consent screen,
@@ -134,8 +135,9 @@ def login():
             include_granted_scopes='true' # Optional: pre-select already granted scopes
         )
         session['oauth_state'] = state # Store state for verification in callback
-        print(f"Generated authorization URL: {authorization_url}")
-        print(f"Stored state in session: {state}")
+        if config.DEBUG_LOGGING:
+            print(f"Generated authorization URL: {authorization_url}")
+            print(f"Stored state in session: {state}")
         
         return redirect(authorization_url)
     except Exception as e:
@@ -147,13 +149,14 @@ def login():
 @auth_bp.route('/oauth2callback') 
 def oauth2callback():
     """Handles the OAuth callback from Google after user authorization."""
-    print("--- OAUTH2CALLBACK START ---")
+    if config.DEBUG_LOGGING: print("--- OAUTH2CALLBACK START ---")
     # Consume any existing flash messages to prevent duplicates
     _ = get_flashed_messages()
 
     state = session.get('oauth_state')
-    print(f"Session state: {state}")
-    print(f"Request args: {request.args}")
+    if config.DEBUG_LOGGING:
+        print(f"Session state: {state}")
+        print(f"Request args: {request.args}")
 
     # Remove the intermediate page logic ('handled' check is gone)
 
@@ -180,7 +183,7 @@ def oauth2callback():
 
     # Retrieve the scopes that were used for the initial auth request
     expected_scopes = session.pop('oauth_request_scopes', config.SCOPES) # Fallback needed?
-    print(f"Retrieved expected scopes from session: {expected_scopes}")
+    if config.DEBUG_LOGGING: print(f"Retrieved expected scopes from session: {expected_scopes}")
 
     # Recreate the flow using the scopes that were originally requested
     flow = get_google_auth_flow(scopes_list=expected_scopes)
@@ -222,7 +225,7 @@ def oauth2callback():
 
         if redirect_url:
             flash("Permissions updated successfully!", "success")
-            print(f"--- OAUTH2CALLBACK END (SUCCESS - UPGRADE) - Redirecting back to: {redirect_url} ---")
+            if config.DEBUG_LOGGING: print(f"--- OAUTH2CALLBACK END (SUCCESS - UPGRADE) - Redirecting back to: {redirect_url} ---")
             # Append a parameter to indicate success or modify state if needed by the target page
             # Example: redirect_url += "?archive_enabled=true"
             # This depends on how the target page consumes this info.
@@ -230,7 +233,7 @@ def oauth2callback():
             return redirect(redirect_url)
         else:
             flash("Authentication successful!", "success")
-            print("--- OAUTH2CALLBACK END (SUCCESS - LOGIN) - Redirecting to index ---")
+            if config.DEBUG_LOGGING: print("--- OAUTH2CALLBACK END (SUCCESS - LOGIN) - Redirecting to index ---")
             return redirect(url_for('index')) # Default redirect to index
 
     except Exception as e:
@@ -238,7 +241,7 @@ def oauth2callback():
         print(f"!!! ERROR in oauth2callback during token fetch/save: {e} !!!")
         utils.clear_credentials() # Ensure credentials are cleared on error
         session.pop('post_auth_redirect', None) # Clear redirect target on error
-        print("--- OAUTH2CALLBACK END (ERROR) ---")
+        if config.DEBUG_LOGGING: print("--- OAUTH2CALLBACK END (ERROR) ---")
         return redirect(url_for('.login')) # Redirect back to login on error
 
 # Logout route remains unchanged for now, seems reasonable.
