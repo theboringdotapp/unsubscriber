@@ -277,7 +277,7 @@
             <h3 class="text-lg font-medium text-foreground mb-2">No Subscriptions Found Yet</h3>
             <p class="text-muted-foreground mb-6">We scanned the most recent emails in your inbox but didn't find any with obvious unsubscribe links in the headers.</p>
             <p class="text-xs text-muted-foreground mb-4">This can happen if emails use non-standard unsubscribe methods or if you haven't received many subscription emails recently.</p>
-            <a href="{{ url_for('index') }}" class="btn btn-secondary mt-4 focus-ring">Back Home</a>
+            <a href="{{ url_for('index') }}" class="btn btn-outline btn-sm mt-4 focus-ring">Back Home</a>
         </div>
     {% elif subscriptions %}
         <form id="unsubscribe-form">
@@ -1685,7 +1685,7 @@
                             </svg>
                             <h3 class="text-lg font-medium text-foreground mb-2">All Done!</h3>
                             <p class="text-muted-foreground mb-6">You've processed all the subscription emails found based on the scan criteria.</p>
-                            <a href="{{ url_for('index') }}" class="btn btn-secondary mt-4 focus-ring">Back Home</a>
+                            <a href="{{ url_for('index') }}" class="btn btn-outline btn-sm mt-4 focus-ring">Back Home</a>
                         </div>
                     `;
                 }
