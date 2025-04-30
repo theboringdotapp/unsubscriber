@@ -199,23 +199,23 @@ def oauth2callback():
              # Check for reverse proxy header common in cloud environments
             forwarded_proto = request.headers.get('x-forwarded-proto')
             if forwarded_proto == 'https':
-                 print("--- DEBUG: oauth2callback: Detected x-forwarded-proto=https, using original request.url ---")
+                 if config.DEBUG_LOGGING: print("--- DEBUG: oauth2callback: Detected x-forwarded-proto=https, using original request.url ---")
             elif not request.url.startswith('https'):
-                 print("--- DEBUG: oauth2callback: Local HTTP detected, and no https proxy header. Replacing http:// with https:// for Google check. ---")
+                 if config.DEBUG_LOGGING: print("--- DEBUG: oauth2callback: Local HTTP detected, and no https proxy header. Replacing http:// with https:// for Google check. ---")
                  authorization_response = authorization_response.replace('http://', 'https://', 1)
 
-        print(f"--- DEBUG: oauth2callback: Fetching token with authorization_response: {authorization_response} ---")
+        if config.DEBUG_LOGGING: print(f"--- DEBUG: oauth2callback: Fetching token with authorization_response: {authorization_response} ---")
 
         # Fetch the token using the authorization response URL
         flow.fetch_token(authorization_response=authorization_response)
-        print("--- DEBUG: oauth2callback: Token fetched successfully. ---")
+        if config.DEBUG_LOGGING: print("--- DEBUG: oauth2callback: Token fetched successfully. ---")
 
         creds = flow.credentials
-        print(f"--- DEBUG: oauth2callback: Credentials obtained with scopes: {creds.scopes} ---")
+        if config.DEBUG_LOGGING: print(f"--- DEBUG: oauth2callback: Credentials obtained with scopes: {creds.scopes} ---")
 
         # Save the obtained credentials to the session
         utils.save_credentials(creds)
-        print(f"--- DEBUG: oauth2callback: Credentials saved. Scopes in saved creds: {creds.scopes} ---")
+        if config.DEBUG_LOGGING: print(f"--- DEBUG: oauth2callback: Credentials saved. Scopes in saved creds: {creds.scopes} ---")
 
         # Determine redirect target
         redirect_url = session.pop('post_auth_redirect', None) # Get stored URL if it exists

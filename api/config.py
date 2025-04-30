@@ -17,6 +17,9 @@ MOCK_API = False
 # Scan limit
 MAX_SCAN_EMAILS = 50
 
+# Debug Logging Flag
+DEBUG_LOGGING = os.getenv('FLASK_DEBUG_LOGGING', 'False').lower() == 'true'
+
 # Gmail API search query terms
 # These terms are combined with OR to find emails that might have unsubscribe options
 UNSUBSCRIBE_SEARCH_TERMS = [

@@ -42,10 +42,12 @@ Create a `.env.development.local` file in the project root with the following va
 ```
 GOOGLE_CREDENTIALS_JSON='content of the credentials.json file'
 FLASK_SECRET_KEY=your-secure-random-key
+FLASK_DEBUG_LOGGING=False
 ```
 
 - `GOOGLE_CREDENTIALS_JSON`: The entire contents of your credentials.json file as a JSON string
 - `FLASK_SECRET_KEY`: A secure random string used by Flask for signing session cookies and protecting against CSRF attacks. Generate a strong key (e.g., using `python -c "import secrets; print(secrets.token_hex(16))"`)
+- `FLASK_DEBUG_LOGGING` (Optional): Set to `True` to enable detailed debug logging in the server console. Useful for troubleshooting. Defaults to `False`.
 
 ### 4. Vercel CLI (for development)
 
