@@ -282,6 +282,12 @@
     {% elif subscriptions %}
         <form id="unsubscribe-form">
             <div id="subscription-list" class="space-y-4">
+                <div class="flex justify-between items-center mb-2">
+                    <a href="#" onclick="selectAllOnPage(); return false;" class="text-xs text-brand hover:underline flex items-center gap-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                        Select All on Page
+                    </a>
+                </div>
                 {% for clean_sender, data in subscriptions.items() %}
                     {% set sender_id = clean_sender|replace(' ', '-')|replace('<', '')|replace('>', '')|replace('@', '-')|replace('.', '-') %}
                     {% set color_index = loop.index0 % colors|length %}
@@ -296,7 +302,7 @@
                                        id="select-sender-{{ sender_id }}" 
                                        class="sender-checkbox form-checkbox h-4 w-4 text-brand border-border rounded focus:ring-brand" 
                                        data-sender="{{ clean_sender|e }}"
-                                       onclick="event.stopPropagation();">
+                                       onclick="event.stopPropagation(); selectAllSenderEmails(this, '{{ sender_id }}');">
                                 <label class="sender-name ml-2">{{ clean_sender }} ({{ data.emails|length }})</label>
                                 {% if data.unsubscribe_link %}
                                 <span class="tooltip-container">
@@ -1965,6 +1971,51 @@
         });
         
         // Update the action bar (which will now hide itself)
+        updateActionBar();
+    }
+
+    function selectAllOnPage() {
+        // Get current selected email ids
+        const selectedIds = getSelectedEmailsFromStorage();
+        
+        // Get all unselected email checkboxes on the current page
+        const unselectedCheckboxes = Array.from(document.querySelectorAll('.email-checkbox:not(:checked)'));
+        
+        // Check if adding all unselected emails would exceed the limit
+        if (selectedIds.length + unselectedCheckboxes.length > MAX_EMAILS) {
+            alert(`Selecting all emails would exceed the maximum limit of ${MAX_EMAILS}. Please deselect some emails first.`);
+            return;
+        }
+        
+        // Select all email checkboxes on the current page
+        document.querySelectorAll('.email-checkbox').forEach(checkbox => {
+            checkbox.checked = true;
+            const emailId = checkbox.value;
+            
+            // Update storage for this email
+            updateStorageForItem(emailId, true);
+            
+            // Update UI
+            const emailRow = document.getElementById(`email-${emailId}`);
+            if (emailRow) {
+                emailRow.classList.add('email-selected');
+            }
+        });
+        
+        // Update all sender checkboxes
+        document.querySelectorAll('.sender-checkbox').forEach(checkbox => {
+            checkbox.checked = true;
+            checkbox.indeterminate = false;
+            
+            // Find the sender group and mark it as selected
+            const senderId = checkbox.id.replace('select-sender-', '');
+            const senderGroup = document.getElementById(`sender-group-${senderId}`);
+            if (senderGroup) {
+                senderGroup.classList.add('sender-selected');
+            }
+        });
+        
+        // Update the action bar
         updateActionBar();
     }
 
