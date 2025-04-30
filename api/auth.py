@@ -11,7 +11,7 @@ from . import utils
 # Using url_prefix simplifies route definitions within this file
 auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
 
-# --- Helper Function ---
+# --- Helper Function --- 
 
 def get_google_auth_flow(scopes_list=None):
     """Creates Google OAuth Flow.
@@ -24,7 +24,7 @@ def get_google_auth_flow(scopes_list=None):
     # Use provided scopes or fallback to config scopes
     scopes_to_use = scopes_list if scopes_list else config.SCOPES
     print(f"Using scopes: {scopes_to_use}")
-
+    
     redirect_uri = config.REDIRECT_URI
     credentials_file = config.CREDENTIALS_FILE
 
@@ -55,7 +55,7 @@ def get_google_auth_flow(scopes_list=None):
         print("GOOGLE_CREDENTIALS_JSON not found. Falling back to credentials file.")
         # Construct path relative to project root
         project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) # api -> project root
-        abs_credentials_file = os.path.join(project_root, credentials_file)
+        abs_credentials_file = os.path.join(project_root, credentials_file) 
         print(f"Attempting to load credentials from file: {abs_credentials_file}")
 
         if not os.path.exists(abs_credentials_file):
@@ -75,7 +75,7 @@ def get_google_auth_flow(scopes_list=None):
             print(f"!!! ERROR in get_google_auth_flow loading/parsing {abs_credentials_file}: {e} !!!")
             return None
 
-# --- Routes ---
+# --- Routes --- 
 
 @auth_bp.route('/login')
 def login():
@@ -92,7 +92,7 @@ def login():
     # Check if user already has modify scope, even if not requested
     already_has_modify = utils.has_modify_scope()
     print(f"User already has modify scope: {already_has_modify}")
-
+    
     # Always start with modify scope if user already has it or if explicitly requested
     if already_has_modify or requested_scope_type == 'modify':
         print("Requesting full scopes (modify + readonly) due to existing permissions or explicit request.")
@@ -113,10 +113,10 @@ def login():
     # Store the scopes we are about to request in the session
     session['oauth_request_scopes'] = scopes_for_flow
     print(f"Stored oauth_request_scopes in session: {scopes_for_flow}")
-
+    
     # Create flow with the determined scopes
     flow = get_google_auth_flow(scopes_list=scopes_for_flow)
-
+    
     if not flow:
         flash("Could not load credentials configuration. Please check server logs.", "error")
         return redirect(url_for('index'))
@@ -136,7 +136,7 @@ def login():
         session['oauth_state'] = state # Store state for verification in callback
         print(f"Generated authorization URL: {authorization_url}")
         print(f"Stored state in session: {state}")
-
+        
         return redirect(authorization_url)
     except Exception as e:
         flash(f"Error generating authorization URL: {e}", "error")
@@ -144,7 +144,7 @@ def login():
         return redirect(url_for('index'))
 
 
-@auth_bp.route('/oauth2callback')
+@auth_bp.route('/oauth2callback') 
 def oauth2callback():
     """Handles the OAuth callback from Google after user authorization."""
     print("--- OAUTH2CALLBACK START ---")
@@ -194,7 +194,7 @@ def oauth2callback():
         authorization_response = request.url
         # Handle http vs https for local development if necessary (though Vercel often handles this)
         # The original https replacement logic might still be useful if running locally *not* via `vercel dev`
-        base_url = config.BASE_URL
+        base_url = config.BASE_URL 
         if base_url.startswith('http://') and ('127.0.0.1' in base_url or 'localhost' in base_url):
              # Check for reverse proxy header common in cloud environments
             forwarded_proto = request.headers.get('x-forwarded-proto')
@@ -247,23 +247,23 @@ def logout():
     """Clears the session and logs the user out completely."""
     # First, clear credentials
     utils.clear_credentials()
-
+    
     # Clear all OAuth-related session data
     session.pop('oauth_state', None)
     # session.pop('requested_scopes', None) # No longer used
     # session.pop('requested_extended_permissions', None) # No longer used
     # session.pop('current_auth_scopes', None) # No longer used
     session.pop('post_auth_redirect', None)
-
+    
     # Clear any other session data
     session.clear()
-
+    
     # Create a response with cache-control headers to clear browser cache
     response = redirect(url_for('index'))
     response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
     response.headers['Pragma'] = 'no-cache'
     response.headers['Expires'] = '0'
-
+    
     # Create HTML with logout script to clear browser storage before redirect
     html = """
     <!DOCTYPE html>
@@ -281,10 +281,10 @@ def logout():
             if (currentTheme) {
                 localStorage.setItem('theme', currentTheme);
             }
-
+            
             // Clear all sessionStorage
             sessionStorage.clear();
-
+            
             // Clear cookies related to this site
             function clearSiteCookies() {
                 const cookies = document.cookie.split("; ");
@@ -305,12 +305,12 @@ def logout():
             }
             clearSiteCookies();
 
-
+            
             // Show message
             document.addEventListener('DOMContentLoaded', function() {
                 document.getElementById('message').textContent = 'You have been logged out. Redirecting...';
             });
-
+            
             // Redirect to homepage after a short delay
             setTimeout(function() {
                 window.location.href = '/'; // Redirect to root
@@ -325,7 +325,7 @@ def logout():
     </body>
     </html>
     """
-
+    
     # Return the HTML directly, which contains the redirect script
     # Use Flask's make_response to set headers on the HTML content
     from flask import make_response

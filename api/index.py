@@ -103,16 +103,6 @@ def privacy():
     authenticated = bool(service)
     return render_template('privacy.html', authenticated=authenticated)
 
-@app.route('/favicon.png')
-def favicon():
-    """Serve the favicon."""
-    return app.send_static_file('img/favicon.png')
-
-@app.route('/images/logo.png')
-def logo():
-    """Serve the logo image."""
-    return app.send_static_file('img/favicon.png')
-
 # --- Main Execution (for local non-Vercel CLI development) ---
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Gmail Unsubscriber Flask App')

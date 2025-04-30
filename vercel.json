@@ -3,16 +3,29 @@
     "builds": [
         {
             "src": "api/index.py",
-            "use": "@vercel/python",
-            "config": {
-                "maxLambdaSize": "15mb"
-            }
+            "use": "@vercel/python"
+        },
+        {
+            "src": "public/**",
+            "use": "@vercel/static"
         }
     ],
     "routes": [
         {
+            "src": "/static/(.*)",
+            "dest": "/public/static/$1"
+        },
+        {
+            "src": "/favicon.ico",
+            "dest": "/public/static/img/favicon.png"
+        },
+        {
+            "src": "/favicon.png",
+            "dest": "/public/static/img/favicon.png"
+        },
+        {
             "src": "/(.*)",
-            "dest": "api/index.py"
+            "dest": "/api/index.py"
         }
     ]
 }
