@@ -1,6 +1,6 @@
 # Production Readiness Checklist
 
-This document outlines the steps needed to prepare the Gmail Bulk Unsubscriber for production deployment, with a focus on optimizing cloud function usage.
+This document outlines the steps needed to prepare the Unsubscriber for production deployment, with a focus on optimizing cloud function usage.
 
 ## High Priority
 

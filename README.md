@@ -1,4 +1,4 @@
-# Gmail Bulk Unsubscriber
+# Unsubscriber
 
 > Clean up your inbox in minutes by easily identifying and removing unwanted subscriptions with just a few clicks.
 
