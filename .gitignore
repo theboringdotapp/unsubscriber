@@ -15,3 +15,4 @@ credentials.json
 .env.test
 
 .vercel
+.env*.local

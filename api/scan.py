@@ -19,7 +19,7 @@ MOCK_API = config.MOCK_API # Get from config
 
 def _get_mock_message_list(page_token=None):
     """Returns a mock response similar to messages.list()."""
-    if config.DEBUG_LOGGING: print("--- USING MOCK MESSAGE LIST ---")
+    if utils.should_log(): print("--- USING MOCK MESSAGE LIST ---")
     # ... (mock implementation as before) ...
     all_mock_messages = [
         {'id': 'mock_id_1', 'threadId': 'thread_1'},
@@ -43,7 +43,7 @@ def _get_mock_message_list(page_token=None):
 
 def _get_mock_message_details(msg_id):
     """Returns mock message details based on ID."""
-    if config.DEBUG_LOGGING: print(f"--- USING MOCK MESSAGE DETAILS FOR ID: {msg_id} ---")
+    if utils.should_log(): print(f"--- USING MOCK MESSAGE DETAILS FOR ID: {msg_id} ---")
     # ... (mock details implementation as before) ...
     details = {
         'mock_id_1': {
@@ -199,24 +199,24 @@ def format_email_date(internal_date_ms):
 @scan_bp.route('/scan', methods=['GET'])
 def scan_emails():
     """Scans recent emails for unsubscribe links, supporting pagination."""
-    if config.DEBUG_LOGGING: print("--- SCAN ROUTE START ---")
+    if utils.should_log(): print("--- SCAN ROUTE START ---")
     page_token = request.args.get('token', None)
-    if config.DEBUG_LOGGING: print(f"--- SCAN ROUTE: Received page token: {page_token} ---")
+    if utils.should_log(): print(f"--- SCAN ROUTE: Received page token: {page_token} ---")
     
     # Store the current page token if we're on a scan page
     # This will be used when returning after permission upgrade
     if page_token:
         session['return_to_scan_token'] = page_token
-        if config.DEBUG_LOGGING: print(f"Storing current scan token: {page_token} for possible return after permission upgrade")
+        if utils.should_log(): print(f"Storing current scan token: {page_token} for possible return after permission upgrade")
     
     # Check if archive feature was just enabled
     archive_enabled = request.args.get('archive_enabled') == 'true'
-    if config.DEBUG_LOGGING: print(f"--- SCAN ROUTE: Archive just enabled: {archive_enabled} ---")
+    if utils.should_log(): print(f"--- SCAN ROUTE: Archive just enabled: {archive_enabled} ---")
 
     service = utils.get_gmail_service()
     if not service:
         flash("Authentication required.", "warning")
-        if config.DEBUG_LOGGING: print("Scan route: Not authenticated.")
+        if utils.should_log(): print("Scan route: Not authenticated.")
         return redirect(url_for('auth.login')) # Redirect to auth blueprint login
     
     authenticated = True 
@@ -224,9 +224,9 @@ def scan_emails():
     next_page_token = None 
     
     # Check if user has archive permissions
-    if config.DEBUG_LOGGING: print("--- SCAN ROUTE: Checking archive permission... ---")
+    if utils.should_log(): print("--- SCAN ROUTE: Checking archive permission... ---")
     has_archive_permission = utils.has_modify_scope()
-    if config.DEBUG_LOGGING: print(f"--- SCAN ROUTE: Result of has_modify_scope check: {has_archive_permission} ---")
+    if utils.should_log(): print(f"--- SCAN ROUTE: Result of has_modify_scope check: {has_archive_permission} ---")
     
     # Define colors here in Python
     colors = [
@@ -240,7 +240,7 @@ def scan_emails():
     ]
 
     try:
-        if config.DEBUG_LOGGING: print("Fetching email page.")
+        if utils.should_log(): print("Fetching email page.")
         max_scan_emails = config.MAX_SCAN_EMAILS # Get constant from config
 
         if MOCK_API:
@@ -332,8 +332,8 @@ def scan_emails():
                      # Optionally skip this email or handle error appropriately
 
         next_page_token = list_response.get('nextPageToken')
-        if config.DEBUG_LOGGING: print(f"--- SCAN ROUTE: Next page token from API: {next_page_token} ---")
-        if config.DEBUG_LOGGING: print(f"Scan finished for this page. Found {len(found_subscriptions)} unique senders on this page.")
+        if utils.should_log(): print(f"--- SCAN ROUTE: Next page token from API: {next_page_token} ---")
+        if utils.should_log(): print(f"Scan finished for this page. Found {len(found_subscriptions)} unique senders on this page.")
 
     except Exception as e:
         flash(f"An error occurred during email scan: {e}", "error")
@@ -377,7 +377,7 @@ def unsubscribe_and_archive():
     if not email_ids:
         return jsonify({"success": False, "error": "Missing email IDs."}), 400
         
-    if config.DEBUG_LOGGING: print(f"--- UNSUBSCRIBE ACTION for {len(email_ids)} emails, Archive: {should_archive} ---")
+    if utils.should_log(): print(f"--- UNSUBSCRIBE ACTION for {len(email_ids)} emails, Archive: {should_archive} ---")
     
     # We'll process unsubscribe actions per sender to avoid duplicates
     processed_senders = set()
@@ -388,7 +388,7 @@ def unsubscribe_and_archive():
     sender_email_map = {}
     
     # Step 1: First pass to organize emails by sender
-    if config.DEBUG_LOGGING: print(f"Organizing {len(email_ids)} emails by sender")
+    if utils.should_log(): print(f"Organizing {len(email_ids)} emails by sender")
     
     # Process in batches to reduce API calls - batch size of 10
     batch_size = 10
@@ -428,7 +428,7 @@ def unsubscribe_and_archive():
                 print(f"Error getting sender for email {msg_id}: {e}")
     
     # Step 2: Find unsubscribe links from the first email for each sender
-    if config.DEBUG_LOGGING: print(f"Found {len(sender_email_map)} unique senders")
+    if utils.should_log(): print(f"Found {len(sender_email_map)} unique senders")
     
     for sender, sender_email_ids in sender_email_map.items():
         if not sender_email_ids:
@@ -459,7 +459,7 @@ def unsubscribe_and_archive():
     
     # We no longer process mailto links automatically
     # Instead we'll save them for the user to handle manually
-    if config.DEBUG_LOGGING: print(f"Found {len(unsubscribe_actions)} mailto unsubscribe links")
+    if utils.should_log(): print(f"Found {len(unsubscribe_actions)} mailto unsubscribe links")
     
     # We'll collect these links to display to the user in the UI
     # No automatic processing is done with the readonly scope
@@ -467,7 +467,7 @@ def unsubscribe_and_archive():
     
     for idx, (msg_id, link_type, link, sender) in enumerate(unsubscribe_actions):
         try:
-            if config.DEBUG_LOGGING: print(f"Found mailto link for {sender}: {link}")
+            if utils.should_log(): print(f"Found mailto link for {sender}: {link}")
             
             # Parse mailto to get details to show to the user
             parsed_mailto = urlparse(link)
@@ -503,7 +503,7 @@ def unsubscribe_and_archive():
     
     # Construct response for UI display (no processing with readonly scope)
     
-    if config.DEBUG_LOGGING: print(f"Found {len(mailto_links)} mailto links for manual handling")
+    if utils.should_log(): print(f"Found {len(mailto_links)} mailto links for manual handling")
     
     final_message = f"Found {len(mailto_links)} email{'s' if len(mailto_links) != 1 else ''} with mailto: unsubscribe links."
     
@@ -525,7 +525,7 @@ def unsubscribe_and_archive():
 def archive_emails():
     """Archives selected emails by removing the INBOX label if user has permission.
     Otherwise informs users this requires modify permission."""
-    if config.DEBUG_LOGGING: print("--- ARCHIVE ROUTE CALLED ---")
+    if utils.should_log(): print("--- ARCHIVE ROUTE CALLED ---")
     
     # Get data from form POST
     email_ids = request.form.getlist('email_ids')
@@ -533,7 +533,7 @@ def archive_emails():
     if not email_ids:
         return jsonify({"success": False, "error": "Missing email IDs."}), 400
         
-    if config.DEBUG_LOGGING: print(f"--- ARCHIVE ACTION for {len(email_ids)} emails ---")
+    if utils.should_log(): print(f"--- ARCHIVE ACTION for {len(email_ids)} emails ---")
     
     # Check if user has archive permissions
     if utils.has_modify_scope():
@@ -568,7 +568,7 @@ def archive_emails():
                     archive_errors.append(f"Error adding message {msg_id} to batch: {e}")
             
             # Execute the batch request
-            if config.DEBUG_LOGGING: print(f"Executing batch archive for {len(email_ids)} emails...")
+            if utils.should_log(): print(f"Executing batch archive for {len(email_ids)} emails...")
             batch.execute()
             
             response_data = {

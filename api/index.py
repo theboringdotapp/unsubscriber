@@ -40,9 +40,16 @@ if not SECRET_KEY_FROM_ENV:
 app.secret_key = SECRET_KEY_FROM_ENV
 print(f"--- Flask App Initialized. Using Secret Key: {app.secret_key[:5]}...{app.secret_key[-5:] if len(app.secret_key) > 10 else ''} ---")
 
+# --- Update Config based on Environment Variable ---
+# Read the debug logging flag *after* app init, ensuring env vars are loaded
+config.DEBUG_LOGGING = os.getenv('FLASK_DEBUG_MODE', 'False').lower() == 'true'
+if utils.should_log():
+    print("--- FLASK_DEBUG_MODE is TRUE --- Verbosely logging startup config...")
+# --- End Update Config ---
+
 # Config values are now primarily in config.py
 # Print config loaded from config.py for verification during startup
-if config.DEBUG_LOGGING:
+if utils.should_log():
     print(f"--- Using BASE_URL from config: {config.BASE_URL} ---")
     print(f"--- Using REDIRECT_URI from config: {config.REDIRECT_URI} ---")
     print(f"--- Using MOCK_API from config: {config.MOCK_API} ---")
@@ -68,19 +75,19 @@ VERCEL_ENV = os.environ.get('VERCEL_ENV', 'development') # Get Vercel environmen
 if PROD_URL and VERCEL_ENV == 'production':
     # Use HTTPS for the production domain
     BASE_URL = f"https://{PROD_URL}"
-    if config.DEBUG_LOGGING: print(f"--- Using Production URL (HTTPS): {BASE_URL} ---")
+    if utils.should_log(): print(f"--- Using Production URL (HTTPS): {BASE_URL} ---")
 elif DEPLOY_URL:
     # Use HTTP for vercel dev (localhost) or preview deployments
     BASE_URL = f"http://{DEPLOY_URL}"
-    if config.DEBUG_LOGGING: print(f"--- Using Deployment URL (HTTP): {BASE_URL} ---")
+    if utils.should_log(): print(f"--- Using Deployment URL (HTTP): {BASE_URL} ---")
 else:
     # Fallback for truly local execution (e.g. `python api/index.py`)
     BASE_URL = 'http://127.0.0.1:5001' # Default for local development
-    if config.DEBUG_LOGGING: print(f"--- Using Localhost Fallback URL (HTTP): {BASE_URL} ---")
+    if utils.should_log(): print(f"--- Using Localhost Fallback URL (HTTP): {BASE_URL} ---")
 
 # Adjust REDIRECT_URI to include the auth blueprint prefix
 REDIRECT_URI = f'{BASE_URL}/auth/oauth2callback'
-if config.DEBUG_LOGGING: print(f"--- Final REDIRECT_URI: {REDIRECT_URI} ---") # Debugging
+if utils.should_log(): print(f"--- Final REDIRECT_URI: {REDIRECT_URI} ---") # Debugging
 # --- End Vercel Specific Configuration ---
 
 # --- Register Blueprints ---
@@ -94,7 +101,7 @@ def index():
     # Use get_gmail_service from utils
     service = utils.get_gmail_service()
     authenticated = bool(service)
-    if config.DEBUG_LOGGING: print(f"Index route: authenticated={authenticated}")
+    if utils.should_log(): print(f"Index route: authenticated={authenticated}")
     return render_template('index.html', authenticated=authenticated)
 
 @app.route('/privacy')
@@ -120,26 +127,26 @@ if __name__ == '__main__':
     # Apply overrides if provided via command line for direct run
     if args.mock:
         config.MOCK_API = True
-        if config.DEBUG_LOGGING: print("--- CLI Override: Using Mock API --- ")
+        if utils.should_log(): print("--- CLI Override: Using Mock API --- ")
     if args.credentials:
         config.CREDENTIALS_FILE = args.credentials
-        if config.DEBUG_LOGGING: print(f"--- CLI Override: Using Credentials File: {config.CREDENTIALS_FILE} ---")
+        if utils.should_log(): print(f"--- CLI Override: Using Credentials File: {config.CREDENTIALS_FILE} ---")
     if args.secret_key:
         app.secret_key = args.secret_key
-        if config.DEBUG_LOGGING: print(f"--- CLI Override: Using Secret Key: {app.secret_key[:5]}... ---")
+        if utils.should_log(): print(f"--- CLI Override: Using Secret Key: {app.secret_key[:5]}... ---")
 
     # Reconstruct BASE_URL and REDIRECT_URI ONLY if redirect-host is provided
     if args.redirect_host:
         local_base_url = f'http://{args.redirect_host}:{args.port}'
         config.REDIRECT_URI = f'{local_base_url}/auth/oauth2callback'
         config.BASE_URL = local_base_url
-        if config.DEBUG_LOGGING:
+        if utils.should_log():
             print(f"--- CLI Override: Base URL: {config.BASE_URL} ---")
             print(f"--- CLI Override: Redirect URI: {config.REDIRECT_URI} ---")
 
-    if config.DEBUG_LOGGING: print("--- Application Start (Local Direct Run) --- ")
+    if utils.should_log(): print("--- Application Start (Local Direct Run) --- ")
     # Print effective settings after potential overrides
-    if config.DEBUG_LOGGING:
+    if utils.should_log():
         print(f"Mode: {'Mock API' if config.MOCK_API else 'Real API'}")
         print(f"Credentials File: {config.CREDENTIALS_FILE}")
         print(f"Redirect URI: {config.REDIRECT_URI}")

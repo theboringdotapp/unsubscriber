@@ -1,7 +1,8 @@
 # api/config.py
 import os
+from . import utils # Import utils relatively
 
-if os.getenv('FLASK_DEBUG_LOGGING', 'False').lower() == 'true': print("--- Loading api/config.py ---") # Debug print
+if utils.should_log(): print("--- Loading api/config.py ---") # Debug print
 
 # --- Configuration Constants ---
 
@@ -18,7 +19,7 @@ MOCK_API = False
 MAX_SCAN_EMAILS = 50
 
 # Debug Logging Flag
-DEBUG_LOGGING = os.getenv('FLASK_DEBUG_LOGGING', 'False').lower() == 'true'
+# DEBUG_LOGGING = os.getenv('FLASK_DEBUG_MODE', 'False').lower() == 'true' # REMOVED - Use utils.should_log() instead
 
 # Gmail API search query terms
 # These terms are combined with OR to find emails that might have unsubscribe options
@@ -43,20 +44,20 @@ _calculated_base_url = None
 
 if PROD_URL and VERCEL_ENV == 'production':
     _calculated_base_url = f"https://{PROD_URL}"
-    if DEBUG_LOGGING: print(f"--- Config: Using Production URL (HTTPS): {_calculated_base_url} ---")
+    if utils.should_log(): print(f"--- Config: Using Production URL (HTTPS): {_calculated_base_url} ---")
 elif DEPLOY_URL:
     _calculated_base_url = f"http://{DEPLOY_URL}"
-    if DEBUG_LOGGING: print(f"--- Config: Using Deployment URL (HTTP): {_calculated_base_url} ---")
+    if utils.should_log(): print(f"--- Config: Using Deployment URL (HTTP): {_calculated_base_url} ---")
 else:
     # Fallback for local non-vercel execution or if VERCEL_URL isn't set
     _calculated_base_url = 'http://127.0.0.1:5001'
-    if DEBUG_LOGGING: print(f"--- Config: Using Localhost Fallback URL (HTTP): {_calculated_base_url} ---")
+    if utils.should_log(): print(f"--- Config: Using Localhost Fallback URL (HTTP): {_calculated_base_url} ---")
 
 BASE_URL = _calculated_base_url
 # Redirect URI includes the auth blueprint prefix
 REDIRECT_URI = f'{BASE_URL}/auth/oauth2callback'
 
-if DEBUG_LOGGING:
+if utils.should_log():
     print(f"--- Config: Final BASE_URL: {BASE_URL} ---")
     print(f"--- Config: Final REDIRECT_URI: {REDIRECT_URI} ---")
 
