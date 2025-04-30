@@ -148,7 +148,8 @@
     
     .tooltip-text {
         visibility: hidden;
-        width: 280px;
+        width: auto;
+        min-width: 200px;
         background-color: hsl(var(--popover));
         color: hsl(var(--popover-foreground));
         border: 1px solid hsl(var(--border));
@@ -264,15 +265,21 @@
 
     <div class="mb-8 text-center">
         <h1 class="text-3xl font-bold text-foreground">Subscriptions</h1>
-        <p class="text-muted-foreground mt-2 subtitle">Found potential subscriptions based on your lastest {{ config.MAX_SCAN_EMAILS }} inbox emails.</p>
+        <p class="text-muted-foreground mt-2 subtitle">Found potential subscriptions based on your latest {{ config.MAX_SCAN_EMAILS }} inbox emails.</p>
     </div>
 
-    {% if not subscriptions %}
-        <div class="card p-6 text-center" style="opacity: 0; animation: scaleIn 0.5s ease forwards; animation-delay: 0.3s;">
-            <p class="text-muted-foreground">No emails with unsubscribe links found in the last {{ config.MAX_SCAN_EMAILS }} scanned messages.</p>
+    {% if not subscriptions and not current_page_token %} {# Check if it's the very first empty scan #}
+        <div class="card p-8 text-center max-w-lg mx-auto mt-10" style="opacity: 0; animation: scaleIn 0.5s ease forwards; animation-delay: 0.3s;">
+            <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto h-12 w-12 text-muted-foreground mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 15l6 6" />
+            </svg>
+            <h3 class="text-lg font-medium text-foreground mb-2">No Subscriptions Found Yet</h3>
+            <p class="text-muted-foreground mb-6">We scanned the most recent emails in your inbox but didn't find any with obvious unsubscribe links in the headers.</p>
+            <p class="text-xs text-muted-foreground mb-4">This can happen if emails use non-standard unsubscribe methods or if you haven't received many subscription emails recently.</p>
             <a href="{{ url_for('index') }}" class="btn btn-secondary mt-4 focus-ring">Back Home</a>
         </div>
-    {% else %}
+    {% elif subscriptions %}
         <form id="unsubscribe-form">
             <div id="subscription-list" class="space-y-4">
                 {% for clean_sender, data in subscriptions.items() %}
@@ -325,16 +332,28 @@
                 {% endfor %}
             </div>
             
-            {% if next_page_token %}
-                <div class="mt-8 text-center">
-                    <a href="{{ url_for('scan.scan_emails', token=next_page_token) }}"
-                       id="scan-more-button"
-                       onclick="setLoading('scan-more-button', 'Loading More...')"
-                       class="btn btn-outline btn-md focus-ring btn-pulse">
-                        Load More Results
-                    </a>
-                </div>
+            {# Pagination/End of Results Logic #}
+            {% if subscriptions %} {# Only show pagination controls if there are *some* results #}
+                {% if next_page_token %}
+                    <div class="mt-8 text-center">
+                        <a href="{{ url_for('scan.scan_emails', token=next_page_token) }}"
+                           id="scan-more-button"
+                           onclick="setLoading('scan-more-button', 'Scanning More...')"
+                           class="btn btn-outline btn-md focus-ring btn-pulse">
+                            Scan More Emails
+                        </a>
+                    </div>
+                {% else %}
+                    {# Display an "End of Results" message #}
+                    <div class="mt-10 text-center text-muted-foreground flex flex-col items-center">
+                         <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                        <p>You've reached the end of the scannable emails.</p>
+                    </div>
+                {% endif %}
             {% endif %}
+            {# End Pagination Logic #}
         </form>
     {% endif %}
 </div>
@@ -546,6 +565,7 @@
     document.addEventListener('DOMContentLoaded', function() {
         loadSelectionFromStorage(); // Check boxes based on storage
         updateActionBar(); // Initial action bar update based on storage
+        markProcessedSenders(); // Mark senders processed in this session
         
         // Add visible class to fixed action bar after a short delay
         setTimeout(() => {
@@ -555,6 +575,75 @@
             }
         }, 600);
     });
+
+    function storeProcessedSenders(senders) {
+        const processedKey = 'processedSenders';
+        let existingSenders = [];
+        try {
+            const stored = sessionStorage.getItem(processedKey);
+            existingSenders = stored ? JSON.parse(stored) : [];
+        } catch (e) {
+            console.error("Error parsing processedSenders from sessionStorage:", e);
+            existingSenders = [];
+        }
+        
+        // Add new senders without duplication
+        const updatedSenders = [...new Set([...existingSenders, ...senders])];
+        
+        try {
+            sessionStorage.setItem(processedKey, JSON.stringify(updatedSenders));
+            console.log("Stored processed senders:", updatedSenders);
+        } catch (e) {
+            console.error("Error saving processedSenders to sessionStorage:", e);
+        }
+    }
+    
+    function getProcessedSenders() {
+        const processedKey = 'processedSenders';
+        try {
+            const stored = sessionStorage.getItem(processedKey);
+            return stored ? JSON.parse(stored) : [];
+        } catch (e) {
+            console.error("Error retrieving processedSenders:", e);
+            return [];
+        }
+    }
+    
+    function markProcessedSenders() {
+        const processedSenders = getProcessedSenders();
+        if (processedSenders.length === 0) return;
+        
+        console.log("Marking processed senders:", processedSenders);
+        
+        document.querySelectorAll('.sender-group').forEach(group => {
+            const senderName = group.getAttribute('data-sender');
+            if (senderName && processedSenders.includes(senderName)) {
+                const senderNameContainer = group.querySelector('.sender-name-container');
+                if (senderNameContainer && !senderNameContainer.querySelector('.processed-indicator-tooltip')) {
+                    // Add a tooltip structure around the checkmark
+                    const tooltipWrapper = document.createElement('span');
+                    tooltipWrapper.classList.add('processed-indicator-tooltip', 'tooltip', 'ml-2'); // Use existing tooltip class
+                    
+                    const iconSpan = document.createElement('span');
+                    iconSpan.classList.add('tooltip-icon-placeholder', 'text-muted-foreground'); // Placeholder, maybe style differently
+                    iconSpan.innerHTML = `
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline-block" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                    `;
+                    
+                    const tooltipText = document.createElement('span');
+                    tooltipText.classList.add('tooltip-text'); // Use existing tooltip style
+                    tooltipText.textContent = 'Processed in this session';
+                    
+                    tooltipWrapper.appendChild(iconSpan);
+                    tooltipWrapper.appendChild(tooltipText);
+                    
+                    senderNameContainer.appendChild(tooltipWrapper);
+                }
+            }
+        });
+    }
 
     // Check checkboxes on the current page based on stored IDs
     function loadSelectionFromStorage() {
@@ -1239,7 +1328,11 @@
         // Show completion modal
         showModal(renderSuccessModalContent(resultData.message, resultData.http_link, resultData));
         
-        // Clear storage on successful processing
+        // Store the senders that were part of this batch
+        storeProcessedSenders(senders);
+        markProcessedSenders(); // Immediately mark them on the current page
+        
+        // Clear selection storage on successful processing
         saveSelectedEmailsToStorage([]);
         saveEmailDetailsToStorage({});
         
@@ -1521,6 +1614,8 @@
     
     // Global functions for modal buttons
     window.removeProcessedEmails = function() {
+        const listContainer = document.getElementById('subscription-list');
+        
         // Use the stored processedEmailIds set during the action call
         if (window.processedEmailIds && window.processedEmailIds.length > 0) {
             console.log(`Removing ${window.processedEmailIds.length} processed emails from view`);
@@ -1563,6 +1658,33 @@
             });
             window.processedEmailIds = []; // Clear the list
         }
+        
+        // Check if the list is empty AFTER removing items
+        if (listContainer && listContainer.querySelectorAll('.sender-group').length === 0) {
+            console.log("Subscription list is now empty.");
+            const scanMoreButton = document.getElementById('scan-more-button');
+            if (scanMoreButton) {
+                console.log("Next page token exists, automatically clicking 'Scan More Emails'.");
+                scanMoreButton.click(); // Trigger loading next page
+            } else {
+                console.log("No next page token, displaying final message.");
+                // Display a final message if no more pages
+                const contentContainer = document.querySelector('.content-container'); 
+                if (contentContainer) {
+                     contentContainer.innerHTML = `
+                        <div class="card p-8 text-center max-w-lg mx-auto mt-10" style="opacity: 0; animation: scaleIn 0.5s ease forwards; animation-delay: 0.1s;">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto h-12 w-12 text-success mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <h3 class="text-lg font-medium text-foreground mb-2">All Done!</h3>
+                            <p class="text-muted-foreground mb-6">You've processed all the subscription emails found based on the scan criteria.</p>
+                            <a href="{{ url_for('index') }}" class="btn btn-secondary mt-4 focus-ring">Back Home</a>
+                        </div>
+                    `;
+                }
+            }
+        }
+        
         closeModal(); // This calls updateActionBar which reads the (now empty) storage
     }
 
