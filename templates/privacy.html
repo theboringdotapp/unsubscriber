@@ -24,6 +24,7 @@
                 <li>Processed in real-time during your session only</li>
                 <li>Never stored permanently on our servers</li>
                 <li>Only used for identifying and processing unsubscribe requests</li>
+                <li>Accessed with minimal permissions (read-only by default)</li>
             </ul>
             
             <h3 class="text-lg font-medium mt-6 mb-2">Usage Data</h3>
@@ -40,8 +41,17 @@
                 <li>Authenticating your account via Google OAuth</li>
                 <li>Scanning your inbox to identify subscription emails</li>
                 <li>Processing unsubscribe requests on your behalf</li>
+                <li>Archiving emails (only when you explicitly grant additional permissions)</li>
                 <li>Improving the functionality and performance of our service</li>
             </ul>
+            
+            <h3 class="text-lg font-medium mt-6 mb-2">Optional Permissions</h3>
+            <p>The application requests the following permissions:</p>
+            <ul class="list-disc pl-6 mt-2 mb-4 space-y-2">
+                <li><strong>Gmail Read-Only</strong> (default): Allows reading email headers to find unsubscribe links</li>
+                <li><strong>Gmail Modify</strong> (optional): Required only if you choose to enable the archive functionality</li>
+            </ul>
+            <p>You will always be informed and asked for explicit consent before any additional permissions are requested.</p>
             
             <h2 class="text-xl font-semibold mt-8 mb-4">Data Security</h2>
             <p>We take data security seriously:</p>

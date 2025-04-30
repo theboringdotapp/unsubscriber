@@ -9,7 +9,7 @@
 - **One-Click Unsubscribe**: Simple interface to manage your email subscriptions
 - **Sender Grouping**: Emails are organized by sender for easier management
 - **Manual Link Access**: Direct access to unsubscribe links when automatic processing isn't possible
-- **Secure & Private**: Read-only access by default with no data storage
+- **Secure & Private**: Read-only access by default with optional permission upgrades
 - **Free & Open Source**: Free tier supports up to 50 emails per scan
 
 ## Setup
@@ -76,11 +76,12 @@ Deploy to Vercel's production environment:
 
 ## Usage
 
-1. **Login**: Click "Login with Google" and authorize the application
+1. **Login**: Click "Login with Google" and authorize the application with read-only access
 2. **Scan Inbox**: Click "Scan Inbox Now" to find subscription emails
 3. **Select Emails**: Check the emails you want to unsubscribe from
 4. **Unsubscribe**: Click "Unsubscribe" to process your selections
 5. **Manual Actions**: For links requiring manual interaction, follow the provided instructions
+6. **Optional Archiving**: Enable archiving functionality by granting additional permissions when prompted
 
 ## Limitations
 
@@ -88,11 +89,13 @@ Deploy to Vercel's production environment:
 - Limited support for links requiring POST requests or complex interactions
 - Free tier supports up to 50 emails per scan
 
-## Security
+## Security & Privacy
 
-- Uses OAuth 2.0 with minimal required permissions
+- Uses OAuth 2.0 with minimal required permissions (read-only by default)
+- Permission-based design with clear explanation of optional extended permissions
 - No email content or user data is stored long-term
 - All data is processed in-memory and discarded after use
+- Transparent permission requests with detailed explanations of what is accessed
 
 ## Contributing
 
