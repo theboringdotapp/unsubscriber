@@ -23,8 +23,9 @@ from . import config # Import the config module
 # Calculate the path to the root directory relative to this file (api/index.py)
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 template_dir = os.path.join(project_root, 'templates')
+static_dir = os.path.join(project_root, 'public/static')
 
-app = Flask(__name__, template_folder=template_dir)
+app = Flask(__name__, template_folder=template_dir, static_folder=static_dir, static_url_path='/static')
 
 # --- Configuration ---
 # Set secret key directly here using environment variable
@@ -81,7 +82,7 @@ print(f"--- Final REDIRECT_URI: {REDIRECT_URI} ---") # Debugging
 app.register_blueprint(auth_bp)
 app.register_blueprint(scan_bp)
 
-# --- Main Route (defined in the main app file) ---
+# --- Main Routes (defined in the main app file) ---
 @app.route('/')
 def index():
     """Home page: Check credentials and show scan button or login."""
@@ -90,6 +91,13 @@ def index():
     authenticated = bool(service)
     print(f"Index route: authenticated={authenticated}")
     return render_template('index.html', authenticated=authenticated)
+
+@app.route('/privacy')
+def privacy():
+    """Privacy Policy page."""
+    service = utils.get_gmail_service()
+    authenticated = bool(service)
+    return render_template('privacy.html', authenticated=authenticated)
 
 # --- Main Execution (for local non-Vercel CLI development) ---
 if __name__ == '__main__':

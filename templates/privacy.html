@@ -1,0 +1,99 @@
+{% extends 'base.html' %}
+
+{% block title %}Privacy Policy - Unsubscriber{% endblock %}
+
+{% block content %}
+<div class="container max-w-4xl mx-auto px-4 relative z-10">
+    <div class="py-8">
+        <h1 class="text-3xl font-bold mb-6 text-foreground">Privacy Policy</h1>
+        <p class="text-sm text-muted-foreground mb-6">Last updated: April 30, 2025</p>
+        
+        <div class="prose prose-sm lg:prose-base dark:prose-invert max-w-none">
+            <p>This Privacy Policy describes our policies and procedures on the collection, use and disclosure of your information when you use the Unsubscriber service and tells you about your privacy rights and how the law protects you.</p>
+            
+            <p>We use your personal data to provide and improve the service. By using the service, you agree to the collection and use of information in accordance with this Privacy Policy.</p>
+            
+            <h2 class="text-xl font-semibold mt-8 mb-4">What Data We Collect</h2>
+            
+            <h3 class="text-lg font-medium mt-6 mb-2">Google Account Information</h3>
+            <p>When you log in with Google, we receive basic profile information such as your name and email address. This information is used solely for authentication purposes and to display your email address during the unsubscription process.</p>
+            
+            <h3 class="text-lg font-medium mt-6 mb-2">Email Data</h3>
+            <p>To provide our unsubscription service, we scan your Gmail inbox for subscription emails and extract unsubscribe links. This data is:</p>
+            <ul class="list-disc pl-6 mt-2 mb-4 space-y-2">
+                <li>Processed in real-time during your session only</li>
+                <li>Never stored permanently on our servers</li>
+                <li>Only used for identifying and processing unsubscribe requests</li>
+            </ul>
+            
+            <h3 class="text-lg font-medium mt-6 mb-2">Usage Data</h3>
+            <p>We collect minimal usage data such as your IP address and browser information. This data is used for:</p>
+            <ul class="list-disc pl-6 mt-2 mb-4 space-y-2">
+                <li>Maintaining the security of our service</li>
+                <li>Optimizing performance and user experience</li>
+                <li>Diagnosing technical issues</li>
+            </ul>
+            
+            <h2 class="text-xl font-semibold mt-8 mb-4">How We Use Your Data</h2>
+            <p>Your data is used exclusively for:</p>
+            <ul class="list-disc pl-6 mt-2 mb-4 space-y-2">
+                <li>Authenticating your account via Google OAuth</li>
+                <li>Scanning your inbox to identify subscription emails</li>
+                <li>Processing unsubscribe requests on your behalf</li>
+                <li>Improving the functionality and performance of our service</li>
+            </ul>
+            
+            <h2 class="text-xl font-semibold mt-8 mb-4">Data Security</h2>
+            <p>We take data security seriously:</p>
+            <ul class="list-disc pl-6 mt-2 mb-4 space-y-2">
+                <li>All data is processed using secure HTTPS connections</li>
+                <li>We use OAuth 2.0 for authentication with minimal required permissions</li>
+                <li>Email data is processed in-memory and discarded after use</li>
+                <li>No email content or user data is stored long-term</li>
+            </ul>
+            
+            <h2 class="text-xl font-semibold mt-8 mb-4">Cookies and Tracking</h2>
+            <p>We use minimal necessary cookies for:</p>
+            <ul class="list-disc pl-6 mt-2 mb-4 space-y-2">
+                <li>Session management (required for authentication)</li>
+                <li>Storing user preferences (like dark/light mode)</li>
+            </ul>
+            <p>We do not use third-party analytics or tracking cookies.</p>
+            
+            <h2 class="text-xl font-semibold mt-8 mb-4">Third-Party Services</h2>
+            <p>Our service integrates with:</p>
+            <ul class="list-disc pl-6 mt-2 mb-4 space-y-2">
+                <li>Google APIs (for Gmail access and authentication)</li>
+                <li>Vercel (for hosting and infrastructure)</li>
+            </ul>
+            <p>Each of these services has their own Privacy Policy and Terms of Service.</p>
+            
+            <h2 class="text-xl font-semibold mt-8 mb-4">Children's Privacy</h2>
+            <p>Our service is not intended for users under the age of 13. We do not knowingly collect personal information from children under 13. If we become aware that we have collected personal data from a child under 13, we take steps to remove that information.</p>
+            
+            <h2 class="text-xl font-semibold mt-8 mb-4">Your Rights</h2>
+            <p>Depending on your location, you may have rights regarding your personal data:</p>
+            <ul class="list-disc pl-6 mt-2 mb-4 space-y-2">
+                <li>Right to access information we have about you</li>
+                <li>Right to rectification of incorrect data</li>
+                <li>Right to erasure of your data</li>
+                <li>Right to restrict or object to processing</li>
+                <li>Right to data portability</li>
+            </ul>
+            <p>Since we don't store your data permanently, many of these rights are automatically fulfilled.</p>
+            
+            <h2 class="text-xl font-semibold mt-8 mb-4">Changes to This Privacy Policy</h2>
+            <p>We may update our Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page and updating the "Last updated" date.</p>
+            <p>You are advised to review this Privacy Policy periodically for any changes. Changes to this Privacy Policy are effective when they are posted on this page.</p>
+            
+            <h2 class="text-xl font-semibold mt-8 mb-4">Contact Us</h2>
+            <p>If you have any questions about this Privacy Policy, you can contact us:</p>
+            <p class="mt-2 mb-6">By email: <a href="mailto:contact@theboring.app" class="text-brand hover:underline">contact@theboring.app</a></p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block footer %}
+{{ super() }}
+{% endblock %}
