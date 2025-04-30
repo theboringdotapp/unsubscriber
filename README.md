@@ -2,6 +2,8 @@
 
 > Clean up your inbox in minutes by easily identifying and removing unwanted subscriptions with just a few clicks.
 
+**DISCLAIMER:** This project was built entirely using AI through vibecoding. No code was written by humans.
+
 ## Features
 
 - **Intelligent Scanning**: Automatically identifies subscription emails in your Gmail inbox
@@ -29,15 +31,23 @@
 ### 2. Python Environment & Dependencies
 
 ```bash
-# Create and activate virtual environment
-python3 -m venv venv
-source venv/bin/activate  # On Windows use `venv\Scripts\activate`
-
 # Install dependencies
 pip install -r requirements.txt
 ```
 
-### 3. Vercel CLI (for development)
+### 3. Environment Variables
+
+Create a `.env.development.local` file in the project root with the following variables:
+
+```
+GOOGLE_CREDENTIALS_JSON='content of the credentials.json file'
+FLASK_SECRET_KEY=your-secure-random-key
+```
+
+- `GOOGLE_CREDENTIALS_JSON`: The entire contents of your credentials.json file as a JSON string
+- `FLASK_SECRET_KEY`: A secure random string used by Flask for signing session cookies and protecting against CSRF attacks. Generate a strong key (e.g., using `python -c "import secrets; print(secrets.token_hex(16))"`)
+
+### 4. Vercel CLI (for development)
 
 ```bash
 # Install Vercel CLI globally
@@ -56,23 +66,6 @@ vercel dev --listen 127.0.0.1:5001
 ```
 
 Open your browser and navigate to `http://localhost:5001`
-
-### Alternative: Direct Python Execution
-
-If you don't want to use Vercel for local development:
-
-```bash
-python api/index.py --debug
-```
-
-### Production Deployment
-
-Deploy to Vercel's production environment:
-
-1. Run `vercel` to deploy to a preview environment
-2. Run `vercel --prod` to deploy to production
-3. Add your `credentials.json` content as an environment variable named `GOOGLE_CREDENTIALS_JSON` in the Vercel dashboard
-4. Add `FLASK_SECRET_KEY` environment variable with a secure random string
 
 ## Usage
 
