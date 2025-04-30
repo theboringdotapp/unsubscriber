@@ -4,12 +4,7 @@
 
 {% block head_extra %}
 <style>
-    /* Inherit checkmark styles from base.html */
-
-    /* Modal overlay */
-    /* Inherit modal overlay styles from base.html */
-
-    /* Sender group styles - Keep custom colors logic for now */
+    /* Sender group styles with custom colors */
     .sender-group {
         border-left: 3px solid hsl(var(--sender-color-hsl, var(--brand))); /* Use HSL */
         margin-bottom: 1rem;
@@ -301,10 +296,6 @@
                                        target="_blank" 
                                        class="ml-2 text-xs text-brand hover:underline" 
                                        onclick="event.stopPropagation();">Link</a>
-                                <!--     <span class="tooltip">
-                                        <span class="tooltip-icon">?</span>
-                                        <span class="tooltip-text">Primary unsubscribe link found: {{ data.unsubscribe_link }}. Clicking 'Unsubscribe' below might use this or a mailto link from an individual email.</span>
-                                    </span> -->
                                 </span>
                                 {% endif %}
                             </div>

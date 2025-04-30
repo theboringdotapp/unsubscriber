@@ -1,58 +1,107 @@
-# Gmail Bulk Unsubscriber MVP
+# Gmail Bulk Unsubscriber
 
-A simple Flask application to scan your Gmail account, identify emails with unsubscribe links (primarily using the `List-Unsubscribe` header), and allow you to bulk unsubscribe and archive them.
+> Clean up your inbox in minutes by easily identifying and removing unwanted subscriptions with just a few clicks.
 
 ## Features
 
-*   Authenticates with your Google Account using OAuth 2.0.
-*   Scans recent emails (or those matching a basic query) for `List-Unsubscribe` headers.
-*   Displays a list of emails with potential unsubscribe links.
-*   Allows selection of emails to process.
-*   Attempts to visit the unsubscribe link (via HTTP GET).
-*   Archives the selected emails in Gmail.
+- **Intelligent Scanning**: Automatically identifies subscription emails in your Gmail inbox
+- **Batch Processing**: Select and unsubscribe from multiple newsletters at once
+- **One-Click Unsubscribe**: Simple interface to manage your email subscriptions
+- **Sender Grouping**: Emails are organized by sender for easier management
+- **Manual Link Access**: Direct access to unsubscribe links when automatic processing isn't possible
+- **Secure & Private**: Read-only access by default with no data storage
+- **Free & Open Source**: Free tier supports up to 50 emails per scan
 
 ## Setup
 
-1.  **Google Cloud Project & Credentials:**
-    *   Go to the [Google Cloud Console](https://console.cloud.google.com/).
-    *   Create a new project (or use an existing one).
-    *   Enable the **Gmail API** for your project.
-    *   Go to "Credentials" -> "Create Credentials" -> "OAuth client ID".
-    *   Choose "Web application" as the application type.
-    *   Add `http://localhost:5000` under "Authorized JavaScript origins".
-    *   Add `http://localhost:5000/oauth2callback` under "Authorized redirect URIs".
-    *   Create the client ID. Download the JSON file and save it as `credentials.json` in the project's root directory.
-    *   **IMPORTANT:** You might need to add your Google account as a "Test User" in the OAuth consent screen settings while the app is in the "Testing" publishing status, otherwise, Google might block the login.
+### 1. Google Cloud Project & Credentials
 
-2.  **Python Environment & Dependencies:**
-    *   It's recommended to use a virtual environment:
-        ```bash
-        python3 -m venv venv
-        source venv/bin/activate  # On Windows use `venv\Scripts\activate`
-        ```
-    *   Install the required packages:
-        ```bash
-        pip install -r requirements.txt
-        ```
+1. Go to the [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project (or use an existing one)
+3. Enable the **Gmail API** for your project
+4. Go to "Credentials" → "Create Credentials" → "OAuth client ID"
+5. Choose "Web application" as the application type
+6. Add your domain (or `http://localhost:5001`) under "Authorized JavaScript origins"
+7. Add your callback URL (or `http://localhost:5001/auth/oauth2callback`) under "Authorized redirect URIs"
+8. Create the client ID and download the JSON file as `credentials.json` in the project's root directory
+9. **Important**: Add your Google account as a "Test User" in the OAuth consent screen settings
+
+### 2. Python Environment & Dependencies
+
+```bash
+# Create and activate virtual environment
+python3 -m venv venv
+source venv/bin/activate  # On Windows use `venv\Scripts\activate`
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+### 3. Vercel CLI (for development)
+
+```bash
+# Install Vercel CLI globally
+npm install -g vercel
+```
 
 ## Running the Application
 
-1.  Make sure `credentials.json` is in the same directory as `app.py`.
-2.  Run the Flask development server:
-    ```bash
-    python app.py
-    ```
-3.  Open your web browser and navigate to `http://localhost:5000`.
-4.  Click "Login with Google" and follow the authentication flow. You will likely see a warning screen from Google because the app isn't verified; you'll need to proceed through the "advanced" options to allow access.
-5.  Once authenticated, click "Scan Emails for Unsubscribe Links".
-6.  Select the emails you want to unsubscribe from and click "Unsubscribe & Archive Selected".
+### Local Development with Vercel
 
-## Limitations & Future Improvements (MVP)
+The recommended way to run the project locally (handles both frontend and backend):
 
-*   **Unsubscribe Method:** Only handles HTTP GET links found in `List-Unsubscribe` headers. Does not handle `mailto:` links or complex unsubscribe forms requiring POST requests or JavaScript.
-*   **Link Visiting:** Simply makes a GET request. Success isn't guaranteed, and some links might require browser interaction.
-*   **Email Parsing:** Does not currently parse the email body for unsubscribe links, only the headers.
-*   **Error Handling:** Basic error handling. Could be more robust.
-*   **Scalability:** Scans a limited number of recent emails. Not suitable for very large mailboxes without adjustments.
-*   **Security:** Stores OAuth tokens (`token.pickle`) locally. Suitable for personal use but not for a shared environment. `credentials.json` should also be kept secure.
-*   **UI:** Very basic user interface. 
+```bash
+# Make sure credentials.json is in the project root
+vercel dev --listen 127.0.0.1:5001
+```
+
+Open your browser and navigate to `http://localhost:5001`
+
+### Alternative: Direct Python Execution
+
+If you don't want to use Vercel for local development:
+
+```bash
+python api/index.py --debug
+```
+
+### Production Deployment
+
+Deploy to Vercel's production environment:
+
+1. Run `vercel` to deploy to a preview environment
+2. Run `vercel --prod` to deploy to production
+3. Add your `credentials.json` content as an environment variable named `GOOGLE_CREDENTIALS_JSON` in the Vercel dashboard
+4. Add `FLASK_SECRET_KEY` environment variable with a secure random string
+
+## Usage
+
+1. **Login**: Click "Login with Google" and authorize the application
+2. **Scan Inbox**: Click "Scan Inbox Now" to find subscription emails
+3. **Select Emails**: Check the emails you want to unsubscribe from
+4. **Unsubscribe**: Click "Unsubscribe" to process your selections
+5. **Manual Actions**: For links requiring manual interaction, follow the provided instructions
+
+## Limitations
+
+- Supports HTTP links and mailto: links found in `List-Unsubscribe` headers
+- Limited support for links requiring POST requests or complex interactions
+- Free tier supports up to 50 emails per scan
+
+## Security
+
+- Uses OAuth 2.0 with minimal required permissions
+- No email content or user data is stored long-term
+- All data is processed in-memory and discarded after use
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
+
+This project is open source and available under the [MIT License](LICENSE).
+
+---
+
+Made with ♥ by [theboring.app](https://theboring.app)

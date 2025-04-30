@@ -87,31 +87,12 @@ def find_unsubscribe_links(message_data):
         if not unsubscribe_info["header_link"] and not unsubscribe_info["mailto_link"]:
             # Try to extract from List-ID or other headers
             list_id = None
-            feedback_id = None
             
             for header in headers:
                 if header['name'].lower() == 'list-id':
                     list_id = header['value']
-                elif header['name'].lower() == 'feedback-id':
-                    feedback_id = header['value']
             
-            # If we have list IDs, we could potentially construct unsubscribe URLs
-            # for known email service providers (ESPs)
-            if list_id:
-                # Extract list identifier from format like <list-id.domain.com>
-                match = re.search(r'<([^>]+)>', list_id) if '<' in list_id else None
-                list_identifier = match.group(1) if match else list_id.strip()
-                
-                # Check for common ESP patterns
-                if 'mailchimp' in list_identifier:
-                    # For demonstration - would need specific URL patterns
-                    pass
-                elif 'sendgrid' in list_identifier:
-                    # For demonstration
-                    pass
-                
-                # Don't set any fallback links here since we don't have reliable patterns
-                # without analyzing more data
+            # Future enhancement: construct unsubscribe URLs for known ESPs
     
     except Exception as e:
         print(f"Error parsing message for unsubscribe link: {e}")
@@ -162,21 +143,11 @@ def parse_unsubscribe_header_value(value, unsubscribe_info):
 
 def render_unsubscribe_modal_content(success=True, message="", http_link=None):
     """Renders an HTML snippet for the unsubscribe result modal."""
-    # ... (implementation as before) ...
-    if success:
-        status_message = message or "Request processed successfully!"
-        link_message = ""
-        if http_link: link_message = f'<p class="...">...<a href="{http_link}"...>visit the unsubscribe link</a>...</p>'
-        html = f"""<div class="text-center...">...<svg>...</svg><h3>Success!</h3><p>{status_message}</p>{link_message}<button onclick="window.removeProcessedEmails()">Done</button></div>"""
-    else:
-        status_message = message or "An error occurred."
-        html = f"""<div class="bg-white...">...<svg>...</svg><h3>Error</h3><p>{status_message}</p><button onclick="window.closeErrorMessage()">Close</button></div>"""
-    # Make sure the full HTML from previous step is here
     if success:
         status_message = message or "Request processed successfully!"
         link_message = ""
         if http_link:
-             link_message = f'<p class="text-sm mt-2 text-[var(--text-secondary)]">You may need to <a href="{http_link}" target="_blank" class="text-[var(--accent-color)] hover:underline">visit the unsubscribe link</a> manually.</p>'
+             link_message = f'<p class="text-sm mt-2 text-muted-foreground">You may need to <a href="{http_link}" target="_blank" class="text-brand hover:underline">visit the unsubscribe link</a> manually.</p>'
         html = f"""
         <div class="text-center p-6 flex flex-col items-center">
             <div class="checkmark-container mb-4">
@@ -185,24 +156,24 @@ def render_unsubscribe_modal_content(success=True, message="", http_link=None):
                     <path class="checkmark-check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
                 </svg>
             </div>
-            <h3 class="text-xl font-semibold text-gray-700 mb-2">Success!</h3>
-            <p class="text-gray-600">{status_message}</p>
+            <h3 class="text-xl font-semibold text-success mb-2">Success!</h3>
+            <p class="text-foreground">{status_message}</p>
             {link_message}
-            <button class="mt-6 px-6 py-2 bg-[var(--accent-color)] text-white rounded-md hover:bg-[var(--accent-hover)]" onclick="window.removeProcessedEmails()">Done</button>
+            <button class="mt-6 btn btn-primary btn-md focus-ring w-full" onclick="window.removeProcessedEmails()">Done</button>
         </div>
         """
     else:
         status_message = message or "An error occurred."
         html = f"""
-        <div class="bg-white rounded-lg p-6 text-center flex flex-col items-center">
+        <div class="bg-background rounded-lg p-6 text-center flex flex-col items-center">
             <div class="error-container mb-4">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-red-500" viewBox="0 0 20 20" fill="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-destructive" viewBox="0 0 20 20" fill="currentColor">
                     <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
                 </svg>
             </div>
-            <h3 class="text-xl font-semibold text-red-600 mb-2">Error</h3>
-            <p class="text-gray-600">{status_message}</p>
-            <button class="mt-4 px-4 py-2 bg-[var(--accent-color)] text-white rounded-md hover:bg-[var(--accent-hover)]" onclick="window.closeErrorMessage()">Close</button>
+            <h3 class="text-xl font-semibold text-destructive mb-2">Error</h3>
+            <p class="text-muted-foreground">{status_message}</p>
+            <button class="mt-4 btn btn-secondary focus-ring" onclick="window.closeErrorMessage()">Close</button>
         </div>
         """
     return html
