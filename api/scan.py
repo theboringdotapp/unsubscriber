@@ -246,15 +246,16 @@ def scan_emails():
         if MOCK_API:
              list_response = _get_mock_message_list(page_token=page_token)
         else:
-            # Enhanced Gmail API query for unsubscribable emails using configuration
-            # Uses OR operator to combine all terms from config for better coverage
-            enhanced_query = ' OR '.join(config.UNSUBSCRIBE_SEARCH_TERMS)
-            
+            # Combine specific header search with keyword fallback
+            keyword_query = ' OR '.join(config.UNSUBSCRIBE_SEARCH_TERMS)
+            combined_query = f"has:list-unsubscribe OR ({keyword_query})"
+            if utils.should_log(): print(f"--- SCAN ROUTE: Using combined query: {combined_query} ---")
+
             list_response = service.users().messages().list(
-                userId='me', 
-                maxResults=20, 
-                pageToken=page_token, 
-                q=enhanced_query,
+                userId='me',
+                maxResults=20,
+                pageToken=page_token,
+                q=combined_query, # Use the combined query
                 labelIds=['INBOX']
             ).execute()
 
