@@ -1,4 +1,8 @@
 import os
+# Set OAuth environment variables to relax token scope validation
+# os.environ['OAUTHLIB_RELAX_TOKEN_SCOPE'] = 'True'
+os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = 'True'  # For development only
+
 import pickle
 import base64
 import email
@@ -91,11 +95,6 @@ def index():
     authenticated = bool(service)
     print(f"Index route: authenticated={authenticated}")
     return render_template('index.html', authenticated=authenticated)
-
-@app.route('/oauth2callback')
-def oauth2callback_landing():
-    """Intermediary landing page to handle OAuth callbacks and prevent redirect loops."""
-    return render_template('oauth2callback.html')
 
 @app.route('/privacy')
 def privacy():

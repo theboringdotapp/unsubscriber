@@ -382,7 +382,8 @@
             <button type="button" onclick="closePermissionModal()" class="btn btn-outline btn-sm focus-ring order-1 sm:order-0">
                 Cancel
             </button>
-            <a href="{{ url_for('auth.login') }}?scope=modify" class="btn btn-brand btn-sm focus-ring order-0 sm:order-1">
+            <!-- Button to trigger permission upgrade -->
+            <a href="{{ url_for('auth.login') }}?scope=modify&return_to={{ request.url | urlencode }}" class="btn btn-brand btn-sm focus-ring order-0 sm:order-1">
                 Allow Access
             </a>
         </div>
@@ -553,14 +554,6 @@
                 actionBar.classList.add('visible');
             }
         }, 600);
-        
-        // If archive was just enabled, check the archive toggle
-        {% if archive_enabled %}
-            const archiveToggle = document.getElementById('archive-toggle');
-            if (archiveToggle) {
-                archiveToggle.checked = true;
-            }
-        {% endif %}
     });
 
     // Check checkboxes on the current page based on stored IDs

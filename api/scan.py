@@ -224,8 +224,9 @@ def scan_emails():
     next_page_token = None 
     
     # Check if user has archive permissions
+    print("--- SCAN ROUTE: Checking archive permission... ---")
     has_archive_permission = utils.has_modify_scope()
-    print(f"--- SCAN ROUTE: User has archive permission: {has_archive_permission} ---")
+    print(f"--- SCAN ROUTE: Result of has_modify_scope check: {has_archive_permission} ---")
     
     # Define colors here in Python
     colors = [
@@ -359,7 +360,6 @@ def scan_emails():
                           next_page_token=next_page_token, 
                           colors=colors,
                           has_archive_permission=has_archive_permission,
-                          archive_enabled=archive_enabled,
                           config=config)
 
 @scan_bp.route('/unsubscribe', methods=['POST'])

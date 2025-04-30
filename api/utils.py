@@ -62,6 +62,15 @@ def get_gmail_service():
 
     print(f"--- DEBUG: get_gmail_service: Credentials loaded. Valid: {creds.valid}, Expired: {creds.expired}, Has Refresh Token: {bool(creds.refresh_token)} ---")
 
+    # Check for scope changes that would cause validation errors during refresh
+    from flask import session
+    current_auth_scopes = session.get('current_auth_scopes', [])
+    
+    if hasattr(creds, 'scopes') and current_auth_scopes and set(creds.scopes) != set(current_auth_scopes):
+        print(f"--- DEBUG: get_gmail_service: Scope mismatch during service creation: Had {creds.scopes}, session has {current_auth_scopes} ---")
+        clear_credentials()
+        return None
+
     if not creds.valid:
         print("--- DEBUG: get_gmail_service: Credentials are not valid. Checking refresh token... ---")
         if creds.expired and creds.refresh_token:
@@ -71,10 +80,16 @@ def get_gmail_service():
                 print("--- DEBUG: get_gmail_service: Token refreshed successfully. Saving new credentials. ---")
                 save_credentials(creds) 
             except Exception as e:
-                flash(f"Error refreshing credentials: {e}. Please re-authenticate.", "error")
-                print(f"--- DEBUG: get_gmail_service: Token refresh FAILED: {e} ---")
-                clear_credentials() 
-                return None 
+                # If refresh fails due to scope validation, prompt for re-auth
+                if "invalid_scope" in str(e).lower() or "scope" in str(e).lower():
+                    print(f"--- DEBUG: get_gmail_service: Scope validation error during refresh: {e} ---")
+                    clear_credentials()
+                    return None
+                else:
+                    flash(f"Error refreshing credentials: {e}. Please re-authenticate.", "error")
+                    print(f"--- DEBUG: get_gmail_service: Token refresh FAILED: {e} ---")
+                    clear_credentials() 
+                    return None 
         else:
             print("--- DEBUG: get_gmail_service: Credentials invalid/expired OR no refresh token. Clearing credentials and returning None. ---")
             clear_credentials() 
@@ -95,14 +110,15 @@ def has_modify_scope():
     """Check if the current user's credentials include the modify scope."""
     creds = load_credentials()
     if not creds:
+        print("--- DEBUG: has_modify_scope: No credentials loaded. Returning False. ---")
         return False
         
     # Check if the modify scope is included in the scopes
     modify_scope = 'https://www.googleapis.com/auth/gmail.modify'
     
+    current_scopes = creds.scopes if hasattr(creds, 'scopes') and isinstance(creds.scopes, list) else []
     # Print current scopes for debugging
-    print(f"--- DEBUG: has_modify_scope: User has these scopes: {creds.scopes} ---")
+    print(f"--- DEBUG: has_modify_scope: Checking scopes in loaded creds: {current_scopes} ---")
     
-    if hasattr(creds, 'scopes') and isinstance(creds.scopes, list):
-        return modify_scope in creds.scopes
-    return False
+    # Return True if modify_scope is present
+    return modify_scope in current_scopes
