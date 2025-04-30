@@ -1759,8 +1759,18 @@
         let senderSummary = '';
         if (senders.length > 0) {
             const maxSendersToShow = 5; // Limit the number of senders shown to avoid cluttering the modal
-            const displayedSenders = senders.slice(0, maxSendersToShow);
-            const remainingSenders = senders.length - maxSendersToShow;
+            
+            // Separate senders requiring manual action from those that don't
+            const manualSenders = senders.filter(sender => manualLinks && manualLinks[sender]);
+            const autoSenders = senders.filter(sender => !(manualLinks && manualLinks[sender]));
+            
+            // Always show all manual senders, then fill remaining slots with automatic ones
+            let displayedManualSenders = manualSenders;
+            let displayedAutoSenders = autoSenders.slice(0, Math.max(0, maxSendersToShow - displayedManualSenders.length));
+            
+            // Combine both lists, prioritizing manual senders
+            const displayedSenders = [...displayedManualSenders, ...displayedAutoSenders];
+            const remainingSenders = senders.length - displayedSenders.length;
             
             let sendersList = displayedSenders.map(sender => {
                 // Check if this sender requires manual action
@@ -1792,7 +1802,11 @@
             }).join('');
             
             if (remainingSenders > 0) {
-                sendersList += `<li class="text-sm text-muted-foreground py-1">And ${remainingSenders} more sender${remainingSenders > 1 ? 's' : ''}...</li>`;
+                // Only show the "And X more senders" if there are no manual senders left in the remaining ones
+                const remainingManualSenders = manualSenders.length - displayedManualSenders.length;
+                if (remainingManualSenders === 0) {
+                    sendersList += `<li class="text-sm text-muted-foreground py-1">And ${remainingSenders} more sender${remainingSenders > 1 ? 's' : ''}...</li>`;
+                }
             }
             
             const summaryTitle = manualCount > 0 ? 
