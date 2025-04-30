@@ -6,6 +6,7 @@ from google_auth_oauthlib.flow import Flow
 # Import constants and utils from other modules in the api package
 from . import config # Import config directly
 from . import utils
+from .oauth_helper import NoScopeValidationFlow
 
 # Define the Blueprint
 # Using url_prefix simplifies route definitions within this file
@@ -17,12 +18,14 @@ def get_google_auth_flow():
     """Creates Google OAuth Flow.
     Attempts to load credentials from GOOGLE_CREDENTIALS_JSON environment variable first.
     Falls back to loading from CREDENTIALS_FILE if the env var is not set.
-    Uses SCOPES and REDIRECT_URI from the main app config.
+    Uses SCOPES from session if available or from config as fallback.
     """
     print("--- GET_GOOGLE_AUTH_FLOW START ---")
 
-    # Use constants from config module
-    scopes = config.SCOPES
+    # Use scopes from session if they're available, otherwise use config scopes
+    scopes = session.get('requested_scopes', config.SCOPES)
+    print(f"Using scopes: {scopes}")
+    
     redirect_uri = config.REDIRECT_URI
     credentials_file = config.CREDENTIALS_FILE
 
@@ -35,7 +38,7 @@ def get_google_auth_flow():
             if 'web' not in client_config and 'installed' not in client_config:
                  print("!!! ERROR: GOOGLE_CREDENTIALS_JSON does not contain 'web' or 'installed' key. !!!")
                  return None
-            flow = Flow.from_client_config(
+            flow = NoScopeValidationFlow.from_client_config(
                 client_config,
                 scopes=scopes,
                 redirect_uri=redirect_uri)
@@ -62,7 +65,7 @@ def get_google_auth_flow():
             return None
 
         try:
-            flow = Flow.from_client_secrets_file(
+            flow = NoScopeValidationFlow.from_client_secrets_file(
                 abs_credentials_file,
                 scopes=scopes,
                 redirect_uri=redirect_uri)
@@ -86,25 +89,31 @@ def login():
     # Check if the user requested extended permissions
     requested_scope = request.args.get('scope')
     
-    # Store original scopes from config
-    original_scopes = config.SCOPES.copy()
+    # Initialize with default scopes
+    requested_scopes = config.SCOPES.copy()
     
-    # Temporarily modify the scopes if user requested modify access
+    # Update to modify scope if requested
     if requested_scope == 'modify':
         print("User requested modify scope for archiving capability")
-        config.SCOPES = ['https://www.googleapis.com/auth/gmail.modify']
+        # Request both scopes to avoid permission errors during scope change
+        requested_scopes = ['https://www.googleapis.com/auth/gmail.modify', 'https://www.googleapis.com/auth/gmail.readonly']
         # Store in session that user requested extended permissions
         session['requested_extended_permissions'] = True
+        session['requested_scopes'] = requested_scopes
         flash("You'll be asked for additional permissions to enable archiving", "info")
     else:
         # Default to read-only mode
         print("Using default read-only scope")
         session.pop('requested_extended_permissions', None)
+        session.pop('requested_scopes', None)
     
+    # Store requested scopes in session for the flow to use
+    session['requested_scopes'] = requested_scopes
+    
+    # Create flow with the requested scopes (flow will get scopes from session)
     flow = get_google_auth_flow()
+    
     if not flow:
-        # Restore original scopes
-        config.SCOPES = original_scopes
         flash("Could not load credentials configuration. Please check server logs.", "error")
         # Redirect to main index, not auth index
         return redirect(url_for('index'))
@@ -112,9 +121,12 @@ def login():
     print(f"[Login Route] Using Flow object: {flow}")
     print(f"[Login Route] Redirect URI from flow object: {flow.redirect_uri}")
     print(f"[Login Route] Redirect URI from config: {config.REDIRECT_URI}")
-    print(f"[Login Route] Using scopes: {config.SCOPES}")
+    print(f"[Login Route] Using scopes: {session.get('requested_scopes') or config.SCOPES}")
 
     try:
+        # Make sure we capture the actual scopes being used for this flow
+        print(f"Using scopes for authorization: {session.get('requested_scopes', config.SCOPES)}")
+        
         authorization_url, state = flow.authorization_url(
             access_type='offline',
             prompt='consent',
@@ -123,13 +135,8 @@ def login():
         print(f"Generated authorization URL: {authorization_url}")
         print(f"Stored state in session: {state}")
         
-        # Restore original scopes after generating the URL
-        config.SCOPES = original_scopes
-        
         return redirect(authorization_url)
     except Exception as e:
-        # Restore original scopes
-        config.SCOPES = original_scopes
         flash(f"Error generating authorization URL: {e}", "error")
         print(f"Error generating authorization URL: {e}")
         return redirect(url_for('index'))
@@ -147,6 +154,21 @@ def oauth2callback():
     state = session.get('oauth_state')
     print(f"Session state: {state}")
     print(f"Request args: {request.args}")
+
+    # Check for the 'handled' flag to prevent redirect loops
+    handled = request.args.get('handled')
+    if not handled:
+        # Redirect to intermediary page that will handle the callback
+        print("First OAuth callback hit - redirecting to intermediary page to prevent loops")
+        query_string = request.query_string.decode('utf-8')
+        
+        # Clear credentials but NOT the oauth_state
+        utils.clear_credentials()
+        session.pop('current_auth_scopes', None)
+        # Keep both requested_scopes and oauth_state to ensure the flow works
+        print("Cleared old credentials before completing flow (preserving oauth_state)")
+        
+        return redirect(f'/oauth2callback?{query_string}&handled=true')
 
     error = request.args.get('error')
     if error:
@@ -167,6 +189,9 @@ def oauth2callback():
          return redirect(url_for('index'))
 
     try:
+        # Log the scopes that the flow is using - this is crucial for debugging
+        print(f"--- DEBUG: OAuth callback using flow with scopes: {flow.oauth2session.scope} ---")
+        
         authorization_response = request.url
         
         # Use BASE_URL from config 
@@ -180,17 +205,50 @@ def oauth2callback():
                  authorization_response = authorization_response.replace('http://', 'https://', 1)
 
         print(f"--- DEBUG: oauth2callback: Fetching token with authorization_response: {authorization_response} ---")
+        # Don't validate scope changes to avoid errors on upgrade
         flow.fetch_token(authorization_response=authorization_response)
         print("--- DEBUG: oauth2callback: Token fetched successfully. ---")
 
         creds = flow.credentials
+        print(f"--- DEBUG: oauth2callback: Credentials scopes: {creds.scopes} ---")
+        
+        # Ensure we have the needed scopes
+        modify_scope = 'https://www.googleapis.com/auth/gmail.modify'
+        readonly_scope = 'https://www.googleapis.com/auth/gmail.readonly'
+        requested_extended_permissions = session.get('requested_extended_permissions', False)
+        
+        # Log the current situation
+        print(f"--- DEBUG: oauth2callback: Extended permissions requested: {requested_extended_permissions} ---")
+        print(f"--- DEBUG: oauth2callback: Checking if creds have required scopes ---")
+        
+        if requested_extended_permissions and modify_scope not in creds.scopes:
+            print(f"--- ERROR: oauth2callback: Modify scope was requested but not granted! ---")
+            flash("The requested permissions were not granted. Please try again.", "error")
+            return redirect(url_for('.login'))
+            
+        # Save credentials and clear session data
         utils.save_credentials(creds) # Use function from utils
         print("--- DEBUG: oauth2callback: Credentials theoretically saved to session. ---")
+        
+        # Clear all OAuth-related session data to prevent stale state
         session.pop('oauth_state', None)
+        session.pop('requested_scopes', None)
+        session.pop('current_auth_scopes', None)
 
-        flash("Authentication successful!", "success")
-        print("--- OAUTH2CALLBACK END (SUCCESS) ---")
-        return redirect(url_for('index'))
+        # If this was an archive permission upgrade, redirect back to scan page with the token
+        requested_extended_permissions = session.get('requested_extended_permissions', False)
+        return_to_scan = session.get('return_to_scan_token')
+        
+        if requested_extended_permissions and return_to_scan:
+            flash("Archive permission successfully enabled!", "success")
+            print(f"--- OAUTH2CALLBACK END (SUCCESS) - Redirecting back to scan with token: {return_to_scan} ---")
+            # Clear the return token from session
+            session.pop('return_to_scan_token', None)
+            return redirect(url_for('scan.scan_emails', token=return_to_scan, archive_enabled='true'))
+        else:
+            flash("Authentication successful!", "success")
+            print("--- OAUTH2CALLBACK END (SUCCESS) ---")
+            return redirect(url_for('index'))
     except Exception as e:
         flash(f"Error fetching token or saving credentials: {e}", "error")
         print(f"!!! ERROR in oauth2callback during token fetch/save: {e} !!!")

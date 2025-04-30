@@ -92,6 +92,11 @@ def index():
     print(f"Index route: authenticated={authenticated}")
     return render_template('index.html', authenticated=authenticated)
 
+@app.route('/oauth2callback')
+def oauth2callback_landing():
+    """Intermediary landing page to handle OAuth callbacks and prevent redirect loops."""
+    return render_template('oauth2callback.html')
+
 @app.route('/privacy')
 def privacy():
     """Privacy Policy page."""

@@ -202,6 +202,16 @@ def scan_emails():
     print("--- SCAN ROUTE START ---")
     page_token = request.args.get('token', None)
     print(f"--- SCAN ROUTE: Received page token: {page_token} ---")
+    
+    # Store the current page token if we're on a scan page
+    # This will be used when returning after permission upgrade
+    if page_token:
+        session['return_to_scan_token'] = page_token
+        print(f"Storing current scan token: {page_token} for possible return after permission upgrade")
+    
+    # Check if archive feature was just enabled
+    archive_enabled = request.args.get('archive_enabled') == 'true'
+    print(f"--- SCAN ROUTE: Archive just enabled: {archive_enabled} ---")
 
     service = utils.get_gmail_service()
     if not service:
@@ -349,6 +359,7 @@ def scan_emails():
                           next_page_token=next_page_token, 
                           colors=colors,
                           has_archive_permission=has_archive_permission,
+                          archive_enabled=archive_enabled,
                           config=config)
 
 @scan_bp.route('/unsubscribe', methods=['POST'])
