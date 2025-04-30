@@ -5,8 +5,8 @@ print("--- Loading api/config.py ---") # Debug print
 
 # --- Configuration Constants ---
 
-# Google API Scopes
-SCOPES = ['https://www.googleapis.com/auth/gmail.modify']
+# Google API Scopes - using only readonly for minimum permissions
+SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
 
 # Credentials file path (relative to project root)
 CREDENTIALS_FILE = 'credentials.json'

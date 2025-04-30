@@ -264,7 +264,8 @@
 
     <div class="mb-8 text-center">
         <h1 class="text-3xl font-bold text-foreground">Scan Results</h1>
-        <p class="text-muted-foreground mt-2 subtitle">Found potential subscriptions. Select emails to unsubscribe or archive.</p>
+        <p class="text-muted-foreground mt-2 subtitle">Found potential subscriptions. Select emails to get unsubscribe links.</p>
+        <p class="text-xs text-muted-foreground mt-1">(Running in read-only mode with minimal permissions)</p>
     </div>
 
     {% if not subscriptions %}
@@ -346,6 +347,49 @@
     </div>
 </div>
 
+<!-- Modal for requesting additional permissions -->
+<div id="permission-modal" class="modal-overlay modal-hidden">
+    <div class="card max-w-md w-full shadow-lg bg-background p-6">
+        <div class="text-center mb-4">
+            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="mx-auto mb-4 text-brand">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                <path d="M9 12l2 2 4-4"></path>
+            </svg>
+            <h3 class="text-xl font-semibold text-foreground">Additional Permissions Required</h3>
+        </div>
+        
+        <div class="text-foreground mb-6 text-sm">
+            <p class="mb-3">To enable archiving functionality, the application needs permission to modify your emails (specifically to archive them by removing the "Inbox" label).</p>
+            
+            <div class="bg-muted/50 p-3 rounded-md mb-3">
+                <h4 class="font-medium mb-2">What this permission allows:</h4>
+                <ul class="list-disc pl-5 space-y-1 text-muted-foreground">
+                    <li>Archiving selected emails after unsubscribing</li>
+                    <li>Moving emails out of your inbox</li>
+                </ul>
+            </div>
+            
+            <div class="bg-muted/50 p-3 rounded-md">
+                <h4 class="font-medium mb-2">What we don't do:</h4>
+                <ul class="list-disc pl-5 space-y-1 text-muted-foreground">
+                    <li>We never delete your emails</li>
+                    <li>We never read email content beyond processing unsubscribe links</li>
+                    <li>We never send emails on your behalf (except for triggering mailto: unsubscribe links)</li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="flex flex-col sm:flex-row gap-3 sm:justify-end">
+            <button type="button" onclick="closePermissionModal()" class="btn btn-outline focus-ring order-1 sm:order-0">
+                Cancel
+            </button>
+            <a href="{{ url_for('auth.login') }}?scope=modify" class="btn btn-brand focus-ring order-0 sm:order-1">
+                Allow Access
+            </a>
+        </div>
+    </div>
+</div>
+
 <!-- Fixed Action Bar for batch operations - redesigned for mobile compatibility -->
 <div id="fixed-action-bar" class="fixed bottom-0 left-0 right-0 bg-background border-t border-border shadow-md z-50 hidden">
     <div class="max-w-7xl mx-auto px-4 py-3 sm:px-6 lg:px-8">
@@ -368,10 +412,25 @@
             
             <!-- Right side - action controls -->
             <div class="flex flex-col sm:flex-row sm:items-center gap-2">
-                <label for="archive-toggle" class="flex items-center text-sm text-muted-foreground shrink-0">
-                    <input type="checkbox" id="archive-toggle" name="archive" checked class="form-checkbox h-4 w-4 text-brand border-border rounded focus:ring-brand mr-2">
-                    Also archive
-                </label>
+                <div class="flex flex-col gap-1 sm:mr-2">
+                    {% if has_archive_permission %}
+                    <label for="archive-toggle" class="flex items-center text-sm text-muted-foreground shrink-0 cursor-pointer">
+                        <input type="checkbox" id="archive-toggle" name="archive" class="form-checkbox h-4 w-4 text-brand border-border rounded focus:ring-brand mr-2 cursor-pointer">
+                        <span>Archive emails</span>
+                    </label>
+                    {% else %}
+                    <label for="archive-toggle" class="flex items-center text-sm text-muted-foreground shrink-0 cursor-not-allowed opacity-60" title="Archiving requires additional permissions">
+                        <input type="checkbox" id="archive-toggle" name="archive" disabled class="form-checkbox h-4 w-4 text-gray-400 border-border rounded focus:ring-brand mr-2 cursor-not-allowed">
+                        <span>Archive unavailable</span>
+                    </label>
+                    <a href="#" onclick="showPermissionModal(); return false;" class="text-xs text-brand hover:underline flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="mr-1">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                        </svg>
+                        Enable archiving
+                    </a>
+                    {% endif %}
+                </div>
                 <button id="unsubscribe-button" type="button" onclick="performUnsubscribe()" class="btn btn-brand btn-sm focus-ring w-full sm:w-auto">
                     Unsubscribe
                 </button>
@@ -1093,9 +1152,17 @@
                 const archiveResult = await response.json();
                 
                 if (!response.ok || !archiveResult.success) {
-                    console.error('Archive operation failed:', archiveResult.error);
+                    console.error('Archive operation failed:', archiveResult.message || archiveResult.error);
                     
-                    if (archiveResult.details && archiveResult.details.archive_errors) {
+                    // Check for permissions issue (status 403)
+                    if (response.status === 403 && archiveResult.details && archiveResult.details.reason) {
+                        // This is a permissions issue - show the user a manual archive instruction
+                        console.log("Permission issue detected:", archiveResult.details.reason);
+                        errors.push(archiveResult.message);
+                        if (archiveResult.details.help_text) {
+                            errors.push(archiveResult.details.help_text);
+                        }
+                    } else if (archiveResult.details && archiveResult.details.archive_errors) {
                         errors.push(...archiveResult.details.archive_errors);
                     } else {
                         errors.push('Failed to archive some emails');
@@ -1413,8 +1480,18 @@
                 saveSelectedEmailsToStorage([]);
                 saveEmailDetailsToStorage({});
             } else {
-                 const errorMessage = resultData.error || `Request failed with status ${response.status}`;
-                 showModal(renderErrorModalContent(errorMessage));
+                 // Check for permission issues
+                 if (response.status === 403 && resultData.details && resultData.details.reason) {
+                     // Create a more helpful error message for permission issues
+                     let permissionMessage = resultData.message || "Archiving emails requires additional permissions";
+                     if (resultData.details.help_text) {
+                         permissionMessage += "\n\n" + resultData.details.help_text;
+                     }
+                     showModal(renderErrorModalContent(permissionMessage));
+                 } else {
+                     const errorMessage = resultData.error || resultData.message || `Request failed with status ${response.status}`;
+                     showModal(renderErrorModalContent(errorMessage));
+                 }
                  window.processedEmailIds = []; // Don't remove items or clear storage on failure
             }
 
@@ -1491,6 +1568,20 @@
 
     window.closeErrorMessage = function() {
         closeModal();
+    }
+    
+    function showPermissionModal() {
+        const modal = document.getElementById('permission-modal');
+        if (modal) {
+            modal.classList.remove('modal-hidden');
+        }
+    }
+    
+    function closePermissionModal() {
+        const modal = document.getElementById('permission-modal');
+        if (modal) {
+            modal.classList.add('modal-hidden');
+        }
     }
 
     // Render success modal content dynamically with processed senders summary

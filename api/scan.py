@@ -213,6 +213,10 @@ def scan_emails():
     found_subscriptions = {} 
     next_page_token = None 
     
+    # Check if user has archive permissions
+    has_archive_permission = utils.has_modify_scope()
+    print(f"--- SCAN ROUTE: User has archive permission: {has_archive_permission} ---")
+    
     # Define colors here in Python
     colors = [
         '217 91% 60%', # Blue
@@ -323,14 +327,29 @@ def scan_emails():
     except Exception as e:
         flash(f"An error occurred during email scan: {e}", "error")
         print(f"!!! ERROR during scan loop: {e} !!!")
-        # Pass colors here too
-        return render_template('scan_results.html', subscriptions=found_subscriptions, error=str(e), authenticated=authenticated, current_page_token=page_token, next_page_token=next_page_token, colors=colors)
+        # Pass colors, archive permission, and config here too
+        return render_template('scan_results.html', 
+                          subscriptions=found_subscriptions, 
+                          error=str(e), 
+                          authenticated=authenticated, 
+                          current_page_token=page_token, 
+                          next_page_token=next_page_token, 
+                          colors=colors,
+                          has_archive_permission=has_archive_permission,
+                          config=config)
 
     if not found_subscriptions and not page_token:
         flash("No emails with unsubscribe links found in the initial scan.", "info")
 
-    # Pass colors to the template context
-    return render_template('scan_results.html', subscriptions=found_subscriptions, authenticated=authenticated, current_page_token=page_token, next_page_token=next_page_token, colors=colors)
+    # Pass colors, archive permission, and config to the template context
+    return render_template('scan_results.html', 
+                          subscriptions=found_subscriptions, 
+                          authenticated=authenticated, 
+                          current_page_token=page_token, 
+                          next_page_token=next_page_token, 
+                          colors=colors,
+                          has_archive_permission=has_archive_permission,
+                          config=config)
 
 @scan_bp.route('/unsubscribe', methods=['POST'])
 def unsubscribe_and_archive():
@@ -427,22 +446,19 @@ def unsubscribe_and_archive():
         except Exception as e:
             print(f"Error finding unsubscribe link for sender {sender} (email {first_email_id}): {e}")
     
-    # Step 3: Process mailto unsubscribe links
-    print(f"Processing {len(unsubscribe_actions)} mailto unsubscribe actions")
+    # We no longer process mailto links automatically
+    # Instead we'll save them for the user to handle manually
+    print(f"Found {len(unsubscribe_actions)} mailto unsubscribe links")
     
-    success_count = 0
-    fail_count = 0
-    errors = []
-    successfully_processed_ids = []
-    
-    # Track which senders were successfully processed
-    processed_sender_map = {}
+    # We'll collect these links to display to the user in the UI
+    # No automatic processing is done with the readonly scope
+    mailto_links = []
     
     for idx, (msg_id, link_type, link, sender) in enumerate(unsubscribe_actions):
         try:
-            print(f"Processing mailto link for {sender}: {link}")
+            print(f"Found mailto link for {sender}: {link}")
             
-            # Parse and send mailto
+            # Parse mailto to get details to show to the user
             parsed_mailto = urlparse(link)
             to_address = parsed_mailto.path
             params = parse_qs(parsed_mailto.query)
@@ -450,171 +466,135 @@ def unsubscribe_and_archive():
             body = params.get('body', ['Please unsubscribe me.'])[0]
             
             if not to_address:
-                raise ValueError("Mailto link missing recipient.")
-            
-            message = MIMEText(body)
-            message['to'] = to_address
-            message['subject'] = subject
-            raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
-            send_message_body = {'raw': raw_message}
-            
-            if MOCK_API:
-                print(f"MOCK SEND EMAIL to {to_address} for {sender}")
-            else:
-                service.users().messages().send(userId='me', body=send_message_body).execute()
-                print(f"Sent mailto for {sender}")
-            
-            success_count += 1
-            processed_sender_map[sender] = True
-            
-            # All emails from this sender are considered processed
-            sender_emails = sender_email_map.get(sender, [])
-            successfully_processed_ids.extend(sender_emails)
+                print(f"Warning: Mailto link missing recipient for {sender}")
+                continue
+                
+            # Add to the list of links to show in the UI
+            mailto_links.append({
+                'sender': sender,
+                'message_id': msg_id,
+                'email': to_address,
+                'subject': subject,
+                'body': body,
+                'link': link
+            })
             
         except Exception as e:
-            fail_count += 1
-            error_detail = f"Failed to process unsubscribe for {sender}: {e}"
+            error_detail = f"Failed to parse mailto link for {sender}: {e}"
             print(f"ERROR: {error_detail}")
-            errors.append(error_detail)
-            processed_sender_map[sender] = False
+    
+    # We don't have success/fail counts or processed IDs anymore
+    # since we're not automatically sending emails
+    successfully_processed_ids = []
     
     # Step 4: Archive emails if requested (now handled client-side in a separate request)
     # Batch archive is now done in a separate endpoint call to optimize cloud function usage
     
-    # Construct response
-    overall_success = fail_count == 0
+    # Construct response for UI display (no processing with readonly scope)
     
-    message_parts = []
-    if success_count > 0:
-        message_parts.append(f"Processed {success_count} mailto unsubscribe action{'s' if success_count != 1 else ''}.")
-    if fail_count > 0:
-        message_parts.append(f"{fail_count} mailto unsubscribe action{'s' if fail_count != 1 else ''} failed.")
+    print(f"Found {len(mailto_links)} mailto links for manual handling")
     
-    final_message = " ".join(message_parts) if message_parts else "No actions performed."
-    
-    # Get unique list of successfully processed senders
-    processed_senders = [
-        sender for sender, success in processed_sender_map.items() if success
-    ]
-    
-    print(f"Successfully processed {len(successfully_processed_ids)} emails via mailto links")
+    final_message = f"Found {len(mailto_links)} email{'s' if len(mailto_links) != 1 else ''} with mailto: unsubscribe links."
     
     response_data = {
-        "success": overall_success,
+        "success": True,
         "message": final_message,
         "details": {
-            "unsubscribe_errors": errors,
-            "processed_senders": processed_senders,
-            "processed_email_ids": successfully_processed_ids
+            "mailto_links": mailto_links,
+            "found_count": len(mailto_links)
         },
         "http_link": None  # No HTTP link needed here as they're handled client-side
     }
 
-    status_code = 200 if overall_success else 500 # Use 500 if any part failed
+    status_code = 200 # Always success as we're just finding links, not processing
     return jsonify(response_data), status_code
 
 # --- Optimized Route for Batch Archiving --- 
 @scan_bp.route('/archive', methods=['POST'])
 def archive_emails():
-    """Archives a list of emails in batches for better performance. Returns JSON."""
-    print("--- BATCH ARCHIVE ROUTE START ---")
-    service = utils.get_gmail_service()
-    if not service:
-        return jsonify({"success": False, "error": "Authentication required."}), 401
-
-    message_ids = request.form.getlist('email_ids') 
-    if not message_ids:
-        print("Archive route: Missing email_ids in form data")
-        return jsonify({"success": False, "error": "Missing email IDs"}), 400
-
-    # Check if message_ids is actually a list (it should be from getlist)
-    if not isinstance(message_ids, list):
-        print("Archive route: email_ids is not a list (unexpected)")
-        message_ids = [message_ids] # Attempt to recover if it's a single string
-        
-    print(f"Archive route: Received {len(message_ids)} IDs to archive.")
-
-    success_count = 0
-    fail_count = 0
-    errors = []
+    """Archives selected emails by removing the INBOX label if user has permission.
+    Otherwise informs users this requires modify permission."""
+    print("--- ARCHIVE ROUTE CALLED ---")
     
-    # Process in batches to reduce API calls
-    batch_size = 50 # Gmail API can handle larger batches
+    # Get data from form POST
+    email_ids = request.form.getlist('email_ids')
     
-    for i in range(0, len(message_ids), batch_size):
-        batch = message_ids[i:i+batch_size]
-        batch_ids = []
+    if not email_ids:
+        return jsonify({"success": False, "error": "Missing email IDs."}), 400
         
-        print(f"Processing archive batch {i//batch_size + 1} with {len(batch)} emails")
-        
-        # Validate the IDs in this batch
-        for msg_id in batch:
-            if msg_id and msg_id.strip():  # Check for valid non-empty IDs
-                batch_ids.append(msg_id.strip())
-            else:
-                print(f"Skipping invalid empty ID")
-        
-        if not batch_ids:
-            print("No valid IDs in this batch, skipping")
-            continue
+    print(f"--- ARCHIVE ACTION for {len(email_ids)} emails ---")
+    
+    # Check if user has archive permissions
+    if utils.has_modify_scope():
+        # User has the necessary permissions, perform archive
+        service = utils.get_gmail_service()
+        if not service:
+            return jsonify({"success": False, "error": "Authentication required."}), 401
             
+        # We have permission and authentication - process the archive request
         try:
-            if MOCK_API:
-                print(f"MOCK BATCH ARCHIVE: {len(batch_ids)} emails")
-                success_count += len(batch_ids)
-            else:
-                # Use batch modification for better performance
-                # The Gmail API supports modifying multiple messages in a single request
-                service.users().messages().batchModify(
-                    userId='me',
-                    body={
-                        'ids': batch_ids,
-                        'removeLabelIds': ['INBOX']
-                    }
-                ).execute()
-                
-                success_count += len(batch_ids)
-                print(f"Successfully archived batch of {len(batch_ids)} emails")
-                
-        except Exception as e:
-            # If batch fails, try individually to identify problematic IDs
-            print(f"Batch archive failed: {e}. Trying individually...")
+            batch = service.new_batch_http_request()
             
-            for msg_id in batch_ids:
+            # Track which IDs were successfully archived
+            archived_ids = []
+            archive_errors = []
+            
+            # Use a batch request for efficiency
+            for idx, msg_id in enumerate(email_ids):
                 try:
-                    if MOCK_API:
-                        print(f"MOCK ARCHIVE EMAIL ID: {msg_id}")
-                    else:
+                    # Add to batch - modify labels by removing INBOX
+                    batch.add(
                         service.users().messages().modify(
                             userId='me',
                             id=msg_id,
                             body={'removeLabelIds': ['INBOX']}
-                        ).execute()
-                    success_count += 1
-                except Exception as individual_error:
-                    fail_count += 1
-                    error_detail = f"Failed to archive {msg_id}: {individual_error}"
-                    print(f"ERROR: {error_detail}")
-                    errors.append(error_detail)
-
-    print(f"Archive route: Finished. Success: {success_count}, Failed: {fail_count}")
-    
-    overall_success = fail_count == 0
-    final_message = f"Successfully archived {success_count} email{'s' if success_count != 1 else ''}."
-    
-    if fail_count > 0:
-        final_message += f" Failed to archive {fail_count} email{'s' if fail_count != 1 else ''}."
-    
-    response_data = {
-        "success": overall_success,
-        "message": final_message,
-        "details": {
-            "archive_errors": errors,
-            "archived_count": success_count
+                        ),
+                        request_id=f'archive_{idx}'
+                    )
+                    archived_ids.append(msg_id)
+                except Exception as e:
+                    print(f"Error adding message {msg_id} to batch: {e}")
+                    archive_errors.append(f"Error adding message {msg_id} to batch: {e}")
+            
+            # Execute the batch request
+            print(f"Executing batch archive for {len(email_ids)} emails...")
+            batch.execute()
+            
+            response_data = {
+                "success": True,
+                "message": f"Successfully archived {len(archived_ids)} emails.",
+                "details": {
+                    "archived_ids": archived_ids,
+                    "archive_errors": archive_errors
+                }
+            }
+            
+            return jsonify(response_data), 200
+            
+        except Exception as e:
+            error_message = f"Error during batch archive operation: {e}"
+            print(f"ARCHIVE ERROR: {error_message}")
+            return jsonify({
+                "success": False,
+                "error": error_message,
+                "message": "Archive operation failed due to a technical error.",
+                "details": {
+                    "archive_errors": [str(e)]
+                }
+            }), 500
+    else:
+        # Inform the user that they don't have the necessary permission for archiving
+        response_data = {
+            "success": False,
+            "message": "Archiving emails requires additional permissions. The application is currently using read-only access.",
+            "details": {
+                "reason": "The application is using the gmail.readonly scope which doesn't allow modifying emails.",
+                "solution": "Users will need to manually archive emails in Gmail.",
+                "permission_required": "https://www.googleapis.com/auth/gmail.modify",
+                "help_text": "To archive emails, please select them in Gmail and use the archive button."
+            }
         }
-    }
-    
-    status_code = 200 if overall_success else 500
-    return jsonify(response_data), status_code
+        
+        return jsonify(response_data), 403  # HTTP 403 Forbidden - correct status code for permission issues
 
 # --- End Optimized Route --- 

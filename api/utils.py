@@ -90,3 +90,19 @@ def get_gmail_service():
         flash(f"Error building Gmail service: {e}", "error")
         print(f"--- DEBUG: get_gmail_service: ERROR building Gmail service: {e}. Returning None. ---")
         return None 
+        
+def has_modify_scope():
+    """Check if the current user's credentials include the modify scope."""
+    creds = load_credentials()
+    if not creds:
+        return False
+        
+    # Check if the modify scope is included in the scopes
+    modify_scope = 'https://www.googleapis.com/auth/gmail.modify'
+    
+    # Print current scopes for debugging
+    print(f"--- DEBUG: has_modify_scope: User has these scopes: {creds.scopes} ---")
+    
+    if hasattr(creds, 'scopes') and isinstance(creds.scopes, list):
+        return modify_scope in creds.scopes
+    return False

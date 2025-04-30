@@ -82,16 +82,37 @@ def login():
     """Initiates the Google OAuth flow."""
     utils.clear_credentials()
     print("Starting login flow, cleared session credentials.")
-
+    
+    # Check if the user requested extended permissions
+    requested_scope = request.args.get('scope')
+    
+    # Store original scopes from config
+    original_scopes = config.SCOPES.copy()
+    
+    # Temporarily modify the scopes if user requested modify access
+    if requested_scope == 'modify':
+        print("User requested modify scope for archiving capability")
+        config.SCOPES = ['https://www.googleapis.com/auth/gmail.modify']
+        # Store in session that user requested extended permissions
+        session['requested_extended_permissions'] = True
+        flash("You'll be asked for additional permissions to enable archiving", "info")
+    else:
+        # Default to read-only mode
+        print("Using default read-only scope")
+        session.pop('requested_extended_permissions', None)
+    
     flow = get_google_auth_flow()
     if not flow:
-         flash("Could not load credentials configuration. Please check server logs.", "error")
-         # Redirect to main index, not auth index
-         return redirect(url_for('index')) 
+        # Restore original scopes
+        config.SCOPES = original_scopes
+        flash("Could not load credentials configuration. Please check server logs.", "error")
+        # Redirect to main index, not auth index
+        return redirect(url_for('index'))
 
     print(f"[Login Route] Using Flow object: {flow}")
     print(f"[Login Route] Redirect URI from flow object: {flow.redirect_uri}")
     print(f"[Login Route] Redirect URI from config: {config.REDIRECT_URI}")
+    print(f"[Login Route] Using scopes: {config.SCOPES}")
 
     try:
         authorization_url, state = flow.authorization_url(
@@ -101,8 +122,14 @@ def login():
         session['oauth_state'] = state
         print(f"Generated authorization URL: {authorization_url}")
         print(f"Stored state in session: {state}")
+        
+        # Restore original scopes after generating the URL
+        config.SCOPES = original_scopes
+        
         return redirect(authorization_url)
     except Exception as e:
+        # Restore original scopes
+        config.SCOPES = original_scopes
         flash(f"Error generating authorization URL: {e}", "error")
         print(f"Error generating authorization URL: {e}")
         return redirect(url_for('index'))

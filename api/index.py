@@ -43,7 +43,7 @@ print(f"--- Using REDIRECT_URI from config: {config.REDIRECT_URI} ---")
 print(f"--- Using MOCK_API from config: {config.MOCK_API} ---")
 
 # Google API Scopes
-SCOPES = ['https://www.googleapis.com/auth/gmail.modify'] # Read, modify (for archiving), send
+SCOPES = ['https://www.googleapis.com/auth/gmail.readonly'] # Read, modify (for archiving), send
 
 # Credentials file path (relative to project root)
 CREDENTIALS_FILE = 'credentials.json' 
@@ -98,6 +98,16 @@ def privacy():
     service = utils.get_gmail_service()
     authenticated = bool(service)
     return render_template('privacy.html', authenticated=authenticated)
+
+@app.route('/favicon.png')
+def favicon():
+    """Serve the favicon."""
+    return app.send_static_file('img/favicon.png')
+
+@app.route('/images/logo.png')
+def logo():
+    """Serve the logo image."""
+    return app.send_static_file('img/favicon.png')
 
 # --- Main Execution (for local non-Vercel CLI development) ---
 if __name__ == '__main__':
