@@ -12,7 +12,8 @@ from datetime import datetime # Add datetime import
 from . import utils
 from . import config # Import config directly
 
-scan_bp = Blueprint('scan', __name__)
+# Add url_prefix to the blueprint
+scan_bp = Blueprint('scan', __name__, url_prefix='/scan')
 
 # --- Mocking Setup (Keep here or move to utils/config?) ---
 MOCK_API = config.MOCK_API # Get from config
@@ -196,7 +197,7 @@ def format_email_date(internal_date_ms):
 
 # --- Routes --- 
 
-@scan_bp.route('/scan', methods=['GET'])
+@scan_bp.route('/emails', methods=['GET'])
 def scan_emails():
     """Scans recent emails for unsubscribe links, supporting pagination."""
     if utils.should_log(): print("--- SCAN ROUTE START ---")

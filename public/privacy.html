@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy Policy - Unsubscriber</title>
+    <link rel="icon" href="/static/img/favicon.png" type="image/png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+    <script>
+        // Theme detection script
+        if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark')
+        } else {
+            document.documentElement.classList.remove('dark')
+        }
+    </script>
+    <!-- Link to static CSS file -->
+    <link rel="stylesheet" href="/static/css/styles.css">
+     <style>
+        /* Minimal styles needed for this page - copied from public/index.html */
+        :root {
+            /* Light mode */
+            --background: 0 0% 100%;
+            --foreground: 240 10% 3.9%;
+            --card: 0 0% 100% / 1;
+            --card-foreground: 240 10% 3.9%;
+            --muted: 240 4.8% 95.9%;
+            --muted-foreground: 240 3.8% 46.1%;
+            --border: 240 5.9% 90%;
+            --brand: 221.2 83.2% 53.3%;
+            --brand-foreground: 210 40% 98%;
+            --radius: 0.5rem;
+        }
+        .dark {
+            /* Dark mode */
+            --background: 240 10% 3.9%;
+            --foreground: 0 0% 98%;
+            --card: 240 10% 3.9% / 1;
+            --card-foreground: 0 0% 98%;
+            --muted: 240 3.7% 15.9%;
+            --muted-foreground: 240 5% 64.9%;
+            --border: 240 3.7% 15.9%;
+            --brand: 217.2 91.2% 59.8%;
+            --brand-foreground: 210 40% 98%;
+        }
+        body {
+            background-color: hsl(var(--background)) !important;
+            color: hsl(var(--foreground));
+            font-family: 'Inter', system-ui, sans-serif;
+            line-height: 1.5;
+        }
+        .btn { display: inline-flex; align-items: center; justify-content: center; white-space: nowrap; border-radius: var(--radius); font-weight: 500; transition: all 0.15s ease-in-out; }
+        .btn-sm { height: 2rem; padding-left: 0.75rem; padding-right: 0.75rem; font-size: 0.875rem; }
+        .btn-brand { background-color: hsl(var(--brand)); color: hsl(var(--brand-foreground)); }
+        .btn-brand:hover { opacity: 0.9; }
+        .focus-ring:focus-visible { outline: none; box-shadow: 0 0 0 2px hsl(var(--background)), 0 0 0 4px hsl(var(--ring, var(--brand)))); }
+        .text-brand { color: hsl(var(--brand)); }
+        .text-muted-foreground { color: hsl(var(--muted-foreground)); }
+        .border-b { border-bottom-width: 1px; }
+        .border-t { border-top-width: 1px; }
+        .border-border { border-color: hsl(var(--border)); }
+        .bg-card { background-color: hsl(var(--card)); }
+        .footer-vibe-coded { display: inline-flex; align-items: center; border-radius: 12px; font-weight: 500; position: relative; overflow: hidden; transition: all 0.3s ease; color: hsl(var(--foreground)); letter-spacing: 0.5px; cursor: default; }
+        .footer-vibe-coded:hover { background-clip: text; -webkit-background-clip: text; color: transparent; background-image: linear-gradient(90deg, #ff00aa, #ff0066, #e100ff, #7f00ff, #00c3ff, #00ffe1, #ff00aa); background-size: 200% auto; animation: textGradientShift 3s linear infinite; text-shadow: 0 0 5px rgba(255, 0, 170, 0.5); }
+        @keyframes textGradientShift { 0% { background-position: 0% center; } 100% { background-position: 200% center; } }
+        .theme-toggle { border: none; background: none; padding: 0.5rem; border-radius: var(--radius); cursor: pointer; transition: background-color 0.2s ease-in-out; }
+        .theme-toggle:hover { background-color: hsl(var(--muted)); }
+        .theme-toggle svg { height: 1.25rem; width: 1.25rem; color: hsl(var(--foreground)); }
+    </style>
+    <!-- Umami Analytics -->
+    <script defer src="https://cloud.umami.is/script.js" data-website-id="2ae0d0a0-78ae-4c42-9f01-be8104391628"></script>
+</head>
+<body class="min-h-screen flex flex-col bg-background text-foreground">
+
+    <!-- Static Navigation Bar -->
+    <nav class="sticky top-0 z-50 bg-card border-b border-border">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center">
+                    <a href="/" class="flex items-center cursor-pointer hover:opacity-90 transition-opacity">
+                        <img src="/static/img/logo.png" alt="Logo" class="h-8 w-8 mr-2">
+                        <span class="font-semibold text-xl text-brand">Unsubscriber</span>
+                    </a>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <button id="theme-toggle" class="theme-toggle focus-ring">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" class="sun-icon" style="display:none;"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" class="moon-icon" style="display:none;"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+                    </button>
+                    <!-- Static Login/Logout Button (Show login if unauthenticated) -->
+                     <a href="/auth/login" class="btn btn-brand btn-sm focus-ring" id="auth-button">
+                         Login with Google
+                     </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main class="flex-grow container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div class="max-w-3xl mx-auto">
+            <h1 class="text-3xl font-bold text-foreground mb-6">Privacy Policy</h1>
+            
+            <div class="prose dark:prose-invert prose-sm sm:prose-base lg:prose-lg max-w-none space-y-4 text-foreground">
+                <p>Last Updated: July 25, 2024</p>
+
+                <p>Welcome to Unsubscriber ("we," "us," or "our"). This Privacy Policy explains how we handle your information when you use our web application accessible at [Your App URL] (the "Service"). By using the Service, you agree to the terms outlined in this policy.</p>
+
+                <h2 class="text-xl font-semibold">Information We Access</h2>
+                <p>When you authenticate with your Google account, we request permission to access certain information from your Gmail account solely for the purpose of providing the Service:</p>
+                <ul>
+                    <li><strong>Email Headers (Read-Only Scope):</strong> We access the headers (like 'From', 'Subject', 'Date', and 'List-Unsubscribe') of your recent emails. This is used to identify potential subscriptions and extract unsubscribe links or email addresses. We do <strong class="text-brand">not</strong> read the body content of your emails with this basic permission level.</li>
+                    <li><strong>Email Modification (Optional Scope):</strong> If you choose to enable the "Archive emails" feature, we request additional permission to modify your emails (<code class="text-xs bg-muted px-1 py-0.5 rounded">gmail.modify</code> scope). This permission is used <strong class="text-brand">exclusively</strong> to move processed emails from your Inbox to your Archive (by removing the 'INBOX' label). We do <strong class="text-brand">not</strong> delete emails or modify them in any other way.</li>
+                </ul>
+
+                <h2 class="text-xl font-semibold">How We Use Information</h2>
+                <ul>
+                    <li><strong>Identifying Subscriptions:</strong> Email headers are scanned locally in your browser or transiently on our server during the scan process to find 'List-Unsubscribe' information.</li>
+                    <li><strong>Facilitating Unsubscribes:</strong> We use the extracted unsubscribe links (HTTP links or mailto: addresses) to help you unsubscribe. HTTP links may be opened directly or processed via a server proxy. Mailto links will typically open your default email client.</li>
+                    <li><strong>Archiving (Optional):</strong> If you grant permission and enable the feature, we use the Gmail API to remove the 'INBOX' label from selected emails after processing unsubscribe requests.</li>
+                </ul>
+
+                <h2 class="text-xl font-semibold">Data Storage and Security</h2>
+                <ul>
+                    <li><strong>No Long-Term Storage:</strong> We do <strong class="text-brand">not</strong> store your email content or headers on our servers after the scan process is complete. Information is processed in memory during the request and discarded afterward.</li>
+                    <li><strong>Authentication Tokens:</strong> Google OAuth tokens are stored securely in your browser's session storage or server-side session (depending on implementation) and are used solely to communicate with the Gmail API on your behalf. These tokens expire and are cleared when you log out or the session ends.</li>
+                    <li><strong>Local Processing:</strong> Where possible, scanning logic attempts to run within your browser to minimize data transfer.</li>
+                </ul>
+
+                <h2 class="text-xl font-semibold">Third-Party Services</h2>
+                <ul>
+                    <li><strong>Google Authentication:</strong> We use Google OAuth for authentication. Your interaction with Google is governed by Google's Privacy Policy.</li>
+                     <li><strong>Hosting:</strong> The application is hosted on Vercel. Vercel's privacy policy applies to the infrastructure.</li>
+                     <li><strong>Analytics:</strong> We use Umami for simple, privacy-focused analytics (page views, feature usage) to improve the service. Umami does not use cookies and anonymizes IP addresses.</li>
+                </ul>
+
+                <h2 class="text-xl font-semibold">Your Choices and Rights</h2>
+                <ul>
+                    <li><strong>Permissions:</strong> You can review and revoke the permissions granted to Unsubscriber at any time through your Google Account settings (<a href="https://myaccount.google.com/permissions" target="_blank" class="text-brand hover:underline">https://myaccount.google.com/permissions</a>).</li>
+                    <li><strong>Logout:</strong> Logging out clears your session and stored authentication tokens.</li>
+                </ul>
+
+                <h2 class="text-xl font-semibold">Open Source</h2>
+                <p>Unsubscriber is open source. You can review the code on <a href="https://github.com/theboring-app/unsubscriber" target="_blank" class="text-brand hover:underline">GitHub</a> to verify how your data is handled.</p>
+
+                <h2 class="text-xl font-semibold">Changes to This Policy</h2>
+                <p>We may update this Privacy Policy. We will notify you of any changes by posting the new policy on this page. You are advised to review this Privacy Policy periodically for any changes.</p>
+
+                <h2 class="text-xl font-semibold">Contact Us</h2>
+                <p>If you have any questions about this Privacy Policy, please contact us via [Your Contact Method - e.g., GitHub Issues, Email].</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- Static Footer -->
+    <footer class="py-8 border-t border-border mt-8">
+        <div class="container max-w-6xl mx-auto px-4">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <div class="mb-4 md:mb-0">
+                    <div class="flex items-center space-x-2">
+                        <span class="font-semibold">
+                            <span class="footer-vibe-coded">vibecoded</span> 
+                            by <a href="https://theboring.app" target="_blank" class="hover:underline">theboring.app</a>
+                        </span>
+                    </div>
+                    <p class="text-sm text-muted-foreground mt-2">Freemium tools for improving your everyday life</p>
+                </div>
+                <div class="flex flex-col items-end">
+                    <div class="flex space-x-4">
+                        <a href="/privacy" class="text-muted-foreground hover:text-foreground transition-colors">Privacy Policy</a>
+                        <a href="https://github.com/theboring-app/unsubscriber" target="_blank" class="text-muted-foreground hover:text-foreground transition-colors flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="mr-2"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"></path><path d="M9 18c-4.51 2-5-2-7-2"></path></svg>
+                            Source Code
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Global JS for theme toggling -->
+    <script>
+        // Theme toggling script (same as index.html)
+         document.addEventListener('DOMContentLoaded', function() {
+            const themeToggle = document.getElementById('theme-toggle');
+            const sunIcon = document.querySelector('.sun-icon');
+            const moonIcon = document.querySelector('.moon-icon');
+            const authButton = document.getElementById('auth-button'); // Get auth button if needed
+            
+            function setTheme(theme) {
+                if (theme === 'dark') {
+                    document.documentElement.classList.add('dark');
+                    if(sunIcon) sunIcon.style.display = 'block';
+                    if(moonIcon) moonIcon.style.display = 'none';
+                    localStorage.theme = 'dark';
+                } else {
+                    document.documentElement.classList.remove('dark');
+                    if(sunIcon) sunIcon.style.display = 'none';
+                    if(moonIcon) moonIcon.style.display = 'block';
+                    localStorage.theme = 'light';
+                }
+            }
+
+            const currentTheme = localStorage.theme || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+            setTheme(currentTheme);
+            
+            themeToggle.addEventListener('click', function() {
+                const newTheme = document.documentElement.classList.contains('dark') ? 'light' : 'dark';
+                setTheme(newTheme);
+            });
+
+            // Optional: Check auth status via a lightweight API endpoint if needed
+            // Example: fetch('/api/auth/status').then(...).then(data => { if(data.authenticated) { update auth button } });
+        });
+    </script>
+
+</body>
+</html> 

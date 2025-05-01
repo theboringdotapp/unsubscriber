@@ -1,105 +1,135 @@
-# Unsubscriber
+# Gmail Unsubscriber
 
-> Clean up your inbox in minutes by easily identifying and removing unwanted subscriptions with just a few clicks.
-
-**DISCLAIMER:** This project was built entirely using AI through vibecoding. No code was written by humans.
+A simple Flask web application to help users easily find and unsubscribe from mailing lists in their Gmail account.
 
 ## Features
 
-- **Intelligent Scanning**: Automatically identifies subscription emails in your Gmail inbox
-- **Batch Processing**: Select and unsubscribe from multiple newsletters at once
-- **One-Click Unsubscribe**: Simple interface to manage your email subscriptions
-- **Sender Grouping**: Emails are organized by sender for easier management
-- **Manual Link Access**: Direct access to unsubscribe links when automatic processing isn't possible
-- **Secure & Private**: Read-only access by default with optional permission upgrades
-- **Free & Open Source**: Free tier supports up to 50 emails per scan
+*   **Google OAuth:** Securely authenticate using your Google account.
+*   **Email Scanning:** Scans recent emails for common unsubscribe headers and links.
+*   **Subscription Grouping:** Groups emails by sender for easier identification.
+*   **One-Click Unsubscribe:** Attempts to automatically unsubscribe using `List-Unsubscribe` headers (both `mailto:` and HTTP links).
+*   **Batch Archiving (Optional):** Allows users to archive processed emails after unsubscribing (requires additional permissions).
+*   **Privacy Focused:** Does not store email content long-term. Processes data transiently.
+*   **Open Source:** Code available for review and contribution.
+*   **Theme Toggle:** Light and Dark mode support.
 
-## Setup
-
-### 1. Google Cloud Project & Credentials
-
-1. Go to the [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a new project (or use an existing one)
-3. Enable the **Gmail API** for your project
-4. Go to "Credentials" → "Create Credentials" → "OAuth client ID"
-5. Choose "Web application" as the application type
-6. Add your domain (or `http://localhost:5001`) under "Authorized JavaScript origins"
-7. Add your callback URL (or `http://localhost:5001/auth/oauth2callback`) under "Authorized redirect URIs"
-8. Create the client ID and download the JSON file as `credentials.json` in the project's root directory
-9. **Important**: Add your Google account as a "Test User" in the OAuth consent screen settings
-
-### 2. Python Environment & Dependencies
-
-```bash
-# Install dependencies
-pip install -r requirements.txt
-```
-
-### 3. Environment Variables
-
-Create a `.env.development.local` file in the project root with the following variables:
+## Project Structure
 
 ```
-GOOGLE_CREDENTIALS_JSON='content of the credentials.json file'
-FLASK_SECRET_KEY=your-secure-random-key
-FLASK_DEBUG_MODE=False
+/gmail-bulk-unsub
+├── api/                  # Flask API backend (Serverless Function on Vercel)
+│   ├── __init__.py
+│   ├── index.py          # Main Flask app setup, /dashboard route
+│   ├── auth.py           # Google OAuth authentication logic
+│   ├── scan.py           # Gmail scanning and unsubscribe logic
+│   ├── utils.py          # Helper functions (Gmail service, credentials)
+│   └── config.py         # Configuration variables
+├── public/               # Static assets served directly by Vercel
+│   ├── index.html        # Static landing page for unauthenticated users
+│   ├── privacy.html      # Static privacy policy page
+│   └── static/           # CSS, JS, Images
+│       ├── css/
+│       ├── js/
+│       └── img/
+├── templates/            # Jinja2 templates used by the Flask app (authenticated views)
+│   ├── base.html         # Base template with nav/footer
+│   ├── index.html        # Authenticated dashboard view
+│   ├── scan_results.html # Results page after scanning
+│   └── partials/         # Template partials (e.g., modal content)
+├── credentials.json      # Google OAuth Client Secrets (Add to .gitignore!)
+├── requirements.txt      # Python dependencies
+├── vercel.json           # Vercel deployment configuration (routing, builds)
+├── .gitignore
+└── README.md
 ```
 
-- `GOOGLE_CREDENTIALS_JSON`: The entire contents of your credentials.json file as a JSON string
-- `FLASK_SECRET_KEY`: A secure random string used by Flask for signing session cookies and protecting against CSRF attacks. Generate a strong key (e.g., using `python -c "import secrets; print(secrets.token_hex(16))"`)
-- `FLASK_DEBUG_MODE` (Optional): Set to `True` to enable detailed debug logging in the server console. Useful for troubleshooting. Defaults to `False`.
+## Setup and Running Locally
 
-### 4. Vercel CLI (for development)
+1.  **Prerequisites:**
+    *   Python 3.8+
+    *   `pip`
+    *   Google Cloud Project with OAuth 2.0 Client ID credentials (see below).
 
-```bash
-# Install Vercel CLI globally
-npm install -g vercel
-```
+2.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/your-username/gmail-bulk-unsub.git
+    cd gmail-bulk-unsub
+    ```
 
-## Running the Application
+3.  **Create Google OAuth Credentials:**
+    *   Go to the [Google Cloud Console](https://console.cloud.google.com/).
+    *   Create a new project or select an existing one.
+    *   Enable the **Gmail API** under "APIs & Services" > "Library".
+    *   Go to "APIs & Services" > "Credentials".
+    *   Click "+ CREATE CREDENTIALS" > "OAuth client ID".
+    *   Select "Web application" as the application type.
+    *   Give it a name (e.g., "Gmail Unsubscriber Local").
+    *   Under "Authorized JavaScript origins", add `http://localhost:5001` and `http://127.0.0.1:5001`.
+    *   Under "Authorized redirect URIs", add `http://localhost:5001/auth/oauth2callback` and `http://127.0.0.1:5001/auth/oauth2callback`.
+    *   Click "Create".
+    *   Download the JSON credentials file and save it as `credentials.json` in the project root directory. **IMPORTANT:** Add `credentials.json` to your `.gitignore` file to avoid committing secrets.
 
-### Local Development with Vercel
+4.  **Set up Python Environment:**
+    ```bash
+    python -m venv venv
+    source venv/bin/activate  # On Windows use `venv\Scripts\activate`
+    pip install -r requirements.txt
+    ```
 
-The recommended way to run the project locally (handles both frontend and backend):
+5.  **Set Environment Variables (Optional but Recommended):**
+    *   Create a `.env` file in the root directory (add `.env` to `.gitignore`).
+    *   Add a strong secret key:
+        ```
+        FLASK_SECRET_KEY='your_strong_random_secret_key'
+        ```
+        You can generate one using `python -c 'import secrets; print(secrets.token_hex())'`.
+    *   If you prefer not to use `.env`, you can set the variable directly in your shell:
+        ```bash
+        export FLASK_SECRET_KEY='your_strong_random_secret_key'
+        ```
+    *   To enable debug logging locally:
+        ```bash
+        export FLASK_DEBUG_MODE=True
+        ```
 
-```bash
-# Make sure credentials.json is in the project root
-vercel dev --listen 127.0.0.1:5001
-```
+6.  **Run the Flask App:**
+    ```bash
+    # Ensure FLASK_SECRET_KEY is set (either via .env loaded or exported)
+    python api/index.py --port 5001 --debug
+    ```
+    *   The `--debug` flag enables Flask's debug mode.
+    *   The app will be accessible at `http://127.0.0.1:5001` or `http://localhost:5001`.
 
-Open your browser and navigate to `http://localhost:5001`
+## Deployment (Vercel)
 
-## Usage
+This app is structured for easy deployment on [Vercel](https://vercel.com/).
 
-1. **Login**: Click "Login with Google" and authorize the application with read-only access
-2. **Scan Inbox**: Click "Scan Inbox Now" to find subscription emails
-3. **Select Emails**: Check the emails you want to unsubscribe from
-4. **Unsubscribe**: Click "Unsubscribe" to process your selections
-5. **Manual Actions**: For links requiring manual interaction, follow the provided instructions
-6. **Optional Archiving**: Enable archiving functionality by granting additional permissions when prompted
+1.  **Push to Git:** Ensure your code is pushed to a Git repository (GitHub, GitLab, Bitbucket).
+2.  **Import Project:** Import your Git repository into Vercel.
+3.  **Configure Project Settings:**
+    *   **Build Command:** Leave empty or use `pip install -r requirements.txt` if needed (Vercel usually detects `requirements.txt` automatically).
+    *   **Output Directory:** Leave as default.
+    *   **Install Command:** Leave as default (`pip install --upgrade pip && pip install -r requirements.txt`).
+    *   **Development Command:** `python api/index.py --port $PORT` (Useful for `vercel dev`).
+4.  **Environment Variables:** Set the following environment variables in your Vercel project settings:
+    *   `FLASK_SECRET_KEY`: Your strong secret key.
+    *   `GOOGLE_CREDENTIALS_JSON`: Paste the *entire content* of your `credentials.json` file here. **Important:** When creating/updating credentials in Google Cloud for Vercel:
+        *   Add your Vercel production URL (e.g., `https://your-app-name.vercel.app`) to "Authorized JavaScript origins".
+        *   Add `https://your-app-name.vercel.app/auth/oauth2callback` to "Authorized redirect URIs".
+    *   `FLASK_DEBUG_MODE` (Optional): Set to `False` or remove for production.
+5.  **Deploy:** Vercel will build and deploy your application.
 
-## Limitations
+**Vercel Structure Notes:**
 
-- Supports HTTP links and mailto: links found in `List-Unsubscribe` headers
-- Limited support for links requiring POST requests or complex interactions
-- Free tier supports up to 50 emails per scan
-
-## Security & Privacy
-
-- Uses OAuth 2.0 with minimal required permissions (read-only by default)
-- Permission-based design with clear explanation of optional extended permissions
-- No email content or user data is stored long-term
-- All data is processed in-memory and discarded after use
-- Transparent permission requests with detailed explanations of what is accessed
+*   The `vercel.json` file configures routing.
+*   Static files (`/public/index.html`, `/public/privacy.html`, `/public/static/*`) are served directly by Vercel's CDN.
+*   API routes (`/dashboard`, `/auth/*`, `/scan/*`) are handled by the Flask app running as a Serverless Function (`api/index.py`).
+*   This minimizes function invocations for unauthenticated users, improving performance and reducing costs.
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions are welcome! Please feel free to submit a Pull Request or open an Issue.
 
 ## License
 
-This project is open source and available under the [MIT License](LICENSE).
-
----
-
-Made with ♥ by [theboring.app](https://theboring.app)
+[MIT License](LICENSE) (Assuming MIT - add a LICENSE file if needed)

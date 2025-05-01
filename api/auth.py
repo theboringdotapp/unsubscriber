@@ -80,6 +80,14 @@ def get_google_auth_flow(scopes_list=None):
 @auth_bp.route('/login')
 def login():
     """Initiates the Google OAuth flow. Handles initial login and permission upgrades."""
+    # --- Check if already authenticated --- 
+    service = utils.get_gmail_service()
+    if service:
+        if utils.should_log(): print("User already authenticated, redirecting to dashboard.")
+        return redirect('/dashboard')
+    # --- End check --- 
+        
+    # If not authenticated, proceed with login flow
     utils.clear_credentials() # Clear any old credentials
     session.pop('oauth_state', None) # Clear old state if any
     session.pop('post_auth_redirect', None) # Clear old redirect target
@@ -115,7 +123,7 @@ def login():
     
     if not flow:
         flash("Could not load credentials configuration. Please check server logs.", "error")
-        return redirect(url_for('index'))
+        return redirect('/') # Redirect to static home page on error
 
     if utils.should_log():
         print(f"[Login Route] Using Flow with scopes: {scopes_for_flow}")
@@ -138,7 +146,7 @@ def login():
     except Exception as e:
         flash(f"Error generating authorization URL: {e}", "error")
         print(f"Error generating authorization URL: {e}")
-        return redirect(url_for('index'))
+        return redirect('/') # Redirect to static home page on error
 
 
 @auth_bp.route('/oauth2callback') 
@@ -162,7 +170,7 @@ def oauth2callback():
         # Clear state if error occurs
         session.pop('oauth_state', None)
         session.pop('post_auth_redirect', None)
-        return redirect(url_for('index'))
+        return redirect('/') # Redirect to static home page on error
 
     request_state = request.args.get('state')
     if not state or state != request_state:
@@ -186,7 +194,7 @@ def oauth2callback():
          flash("Could not load credentials configuration after callback. Check logs.", "error")
          print("get_google_auth_flow returned None during callback.")
          session.pop('post_auth_redirect', None) # Clear redirect target on error
-         return redirect(url_for('index'))
+         return redirect('/') # Redirect to static home page on error
 
     try:
         authorization_response = request.url
@@ -228,8 +236,8 @@ def oauth2callback():
             return redirect(redirect_url)
         else:
             flash("Authentication successful!", "success")
-            if utils.should_log(): print("--- OAUTH2CALLBACK END (SUCCESS - LOGIN) - Redirecting to index ---")
-            return redirect(url_for('index')) # Default redirect to index
+            if utils.should_log(): print("--- OAUTH2CALLBACK END (SUCCESS - LOGIN) - Redirecting to /dashboard ---")
+            return redirect('/dashboard') # Default redirect to dashboard
 
     except Exception as e:
         flash(f"Error processing authentication callback: {e}", "error")
@@ -237,7 +245,7 @@ def oauth2callback():
         utils.clear_credentials() # Ensure credentials are cleared on error
         session.pop('post_auth_redirect', None) # Clear redirect target on error
         if utils.should_log(): print("--- OAUTH2CALLBACK END (ERROR) ---")
-        return redirect(url_for('.login')) # Redirect back to login on error
+        return redirect('/') # Redirect to static home page on error
 
 # Logout route remains unchanged for now, seems reasonable.
 @auth_bp.route('/logout')
@@ -257,7 +265,8 @@ def logout():
     session.clear()
     
     # Create a response with cache-control headers to clear browser cache
-    response = redirect(url_for('index'))
+    # Redirect to static home page '/' which is handled by Vercel
+    response = redirect('/') 
     response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
     response.headers['Pragma'] = 'no-cache'
     response.headers['Expires'] = '0'

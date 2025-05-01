@@ -1,374 +1,106 @@
 {% extends 'base.html' %}
 
-{% block title %}Unsubscriber by theboring.app{% endblock %}
+{% block title %}Unsubscriber Dashboard{% endblock %}
 
 {% block content %}
-<div class="hero-container relative overflow-hidden py-12 md:py-20">
-    <!-- Background elements -->
-    <div class="absolute inset-0 bg-gradient-to-br from-transparent via-transparent to-brand/10 dark:to-brand/5 z-0"></div>
-    <div class="absolute -top-24 -right-24 w-96 h-96 bg-brand/5 rounded-full blur-3xl"></div>
-    <div class="absolute -bottom-24 -left-24 w-96 h-96 bg-brand/5 rounded-full blur-3xl"></div>
-    
-    <!-- Grid background pattern -->
-    <div class="absolute inset-0 bg-grid-pattern opacity-5 dark:opacity-10 z-0"></div>
 
-    <div class="container max-w-6xl mx-auto px-4 relative z-10">
-        {% if not authenticated %}
-        <!-- Non-authenticated users see the original landing page content -->
-        <div class="flex flex-col lg:flex-row items-center gap-12 lg:gap-16">
-            <!-- Text content -->
-            <div class="flex-1 text-center lg:text-left fade-in-up">
-                <div class="flex items-center justify-center lg:justify-start mb-4 space-x-2 fade-in">
-                    <span class="inline-flex items-center justify-center p-1 bg-brand/10 rounded-full">
-                        <span class="pulse-dot"></span>
-                    </span>
-                    <span class="text-xs font-medium py-1 px-2.5 rounded-full bg-brand/10 text-brand">Free & Open Source</span>
+<!-- Authenticated users see the scan interface/dashboard -->
+<div class="content-container">
+    <div class="mb-8 text-center">
+        <h1 class="text-3xl font-bold text-foreground fade-in-up">Your Inbox Dashboard</h1>
+        <p class="text-muted-foreground mt-2 fade-in-up animation-delay-100">Ready to find and manage your subscriptions</p>
+    </div>
+    
+    <div class="flex justify-center mb-10 fade-in-up animation-delay-200">
+        <a href="{{ url_for('scan.scan_emails') }}"
+           id="scan-button"
+           onclick="startScan()" 
+           class="btn btn-brand btn-lg focus-ring shadow-lg shadow-brand/20 hover:shadow-xl hover:shadow-brand/30 hover:-translate-y-0.5 transition-all flex items-center">
+            Scan Inbox Now
+        </a>
+    </div>
+    
+    <!-- Skeleton Subscription List (Placeholder for initial view) -->
+    <div id="skeleton-list" class="space-y-4 max-w-4xl mx-auto fade-in-up animation-delay-300">
+        <!-- Skeleton Sender Groups -->
+        {% for i in range(3) %}
+        <div class="sender-group skeleton-sender">
+            <div class="sender-header">
+                <div class="flex items-center gap-2">
+                    <div class="h-4 w-4 bg-secondary/80 rounded"></div>
+                    <div class="h-5 bg-secondary/80 rounded w-40"></div>
                 </div>
-                
-                <h1 class="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-foreground mb-2 fade-in-up">
-                    <span class="text-brand">Unsubscriber</span>
-                </h1>
-                <p class="text-md font-medium text-muted-foreground mb-4 fade-in">by <a href="https://theboring.app" target="_blank" class="text-brand hover:underline">theboring.app</a></p>
-                
-                <p class="text-lg md:text-xl text-muted-foreground mb-8 max-w-xl mx-auto lg:mx-0 fade-in-up animation-delay-100">
-                    Clean up your inbox in minutes by easily identifying and removing unwanted subscriptions with just a few clicks.
-                </p>
-                
-                <div class="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start items-center fade-in-up animation-delay-200">
-                    <a href="{{ url_for('auth.login') }}"
-                       id="login-button"
-                       class="btn btn-outline btn-lg focus-ring shadow-sm hover:shadow hover:-translate-y-0.5 transition-all flex items-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" class="mr-2">
-                            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                        </svg>
-                        Login with Google
-                    </a>
-                    <div class="text-muted-foreground text-sm flex items-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="mr-2">
-                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"></path>
-                        </svg>
-                        Read-only access by default
+                <div class="h-5 w-5 bg-secondary/80 rounded"></div>
+            </div>
+            <div class="sender-emails">
+                {% for j in range(3) %}
+                <div class="email-row skeleton-email">
+                    <div class="flex items-center flex-1 min-w-0 mr-4">
+                        <div class="h-4 w-4 bg-secondary/80 rounded mr-3"></div>
+                        <div class="h-4 bg-secondary/80 rounded w-full max-w-md"></div>
                     </div>
-                </div>
-            </div>
-            
-            <!-- Illustration/Image -->
-            <div class="flex-1 w-full max-w-md mx-auto lg:mx-0 fade-in-right">
-                <div class="relative animated-card">
-                    <div class="absolute inset-0 bg-gradient-to-r from-brand/20 to-brand/10 rounded-2xl transform rotate-1 scale-105 blur-sm"></div>
-                    <div class="relative bg-card p-6 rounded-xl border border-border shadow-lg">
-                        <!-- Email app header -->
-                        <div class="flex items-center justify-between mb-6">
-                            <div class="flex items-center gap-3">
-                                <div class="h-3 w-3 rounded-full bg-destructive"></div>
-                                <div class="h-3 w-3 rounded-full bg-success"></div>
-                                <div class="h-3 w-3 rounded-full bg-brand/60"></div>
-                            </div>
-                            <div class="text-xs font-medium text-muted-foreground">Clean Inbox</div>
-                        </div>
-                        
-                        <!-- Empty state illustration -->
-                        <div class="text-center py-4">
-                            <div class="inline-flex h-12 w-16 items-center justify-center rounded-full bg-brand/10 mb-3">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-brand">
-                                    <rect width="20" height="16" x="2" y="4" rx="2"/>
-                                    <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
-                                </svg>
-                            </div>
-                            
-                        </div>
-                        
-                        <!-- Completed unsubscriptions -->
-                        <div class="space-y-3 mt-6 border-t border-border pt-4">
-                            <div class="flex items-center gap-2 p-2 rounded-md bg-success/5 border border-success/10">
-                                <div class="h-8 w-8 flex items-center justify-center rounded-full bg-success/20 text-success">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <path d="M20 6 9 17l-5-5"/>
-                                    </svg>
-                                </div>
-                                <div class="space-y-1 flex-1">
-                                    <div class="h-3 bg-secondary/80 rounded w-3/4"></div>
-                                    <div class="h-2 bg-secondary/60 rounded w-2/3"></div>
-                                </div>
-                            </div>
-                            
-                            <div class="flex items-center gap-2 p-2 rounded-md bg-success/5 border border-success/10">
-                                <div class="h-8 w-8 flex items-center justify-center rounded-full bg-success/20 text-success">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <path d="M20 6 9 17l-5-5"/>
-                                    </svg>
-                                </div>
-                                <div class="space-y-1 flex-1">
-                                    <div class="h-3 bg-secondary/80 rounded w-full"></div>
-                                    <div class="h-2 bg-secondary/60 rounded w-2/3"></div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Footer with stats -->
-                        <div class="mt-6 pt-3 border-t border-border">
-                            <div class="flex justify-between items-center">
-                                <div class="flex items-center gap-2">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-success">
-                                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-                                        <path d="M22 4 12 14.01l-3-3"/>
-                                    </svg>
-                                    <div class="text-xs text-success font-medium">All Clean</div>
-                                </div>
-                                <div class="text-xs text-muted-foreground">0 Pending</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Metrics row -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8 fade-in-up animation-delay-300 justify-start">
-            <div class="p-6 bg-secondary/50 rounded-lg text-left">
-                <div class="text-3xl font-bold text-brand mb-2">Free</div>
-                <p class="text-muted-foreground">No credit card required. Free.</p>
-            </div>
-            <div class="p-6 bg-secondary/50 rounded-lg text-left">
-                <div class="text-3xl font-bold text-brand mb-2">Secure</div>
-                <p class="text-muted-foreground">Your emails are only read while scanning. No data is stored.</p>
-            </div>
-            <div class="p-6 bg-secondary/50 rounded-lg text-left">
-                <div class="text-3xl font-bold text-brand mb-2">Open Source</div>
-                <p class="text-muted-foreground">The code is open source and available on <a href="https://github.com/theboringdotapp/unsubscriber" target="_blank" class="text-brand hover:underline">GitHub</a></p>
-            </div>
-        </div>
-        {% else %}
-        <!-- Authenticated users see the skeleton scan interface -->
-        <div class="content-container">
-            <div class="mb-8 text-center">
-                <h1 class="text-3xl font-bold text-foreground fade-in-up">Your Inbox</h1>
-                <p class="text-muted-foreground mt-2 fade-in-up animation-delay-100">Ready to find and manage your subscriptions</p>
-            </div>
-            
-            <div class="flex justify-center mb-10 fade-in-up animation-delay-200">
-                <a href="{{ url_for('scan.scan_emails') }}"
-                   id="scan-button"
-                   onclick="startScan()"
-                   class="btn btn-brand btn-lg focus-ring shadow-lg shadow-brand/20 hover:shadow-xl hover:shadow-brand/30 hover:-translate-y-0.5 transition-all flex items-center">
-                    Scan Inbox Now
-                </a>
-            </div>
-            
-            <!-- Skeleton Subscription List -->
-            <div id="skeleton-list" class="space-y-4 max-w-4xl mx-auto fade-in-up animation-delay-300">
-                <!-- Skeleton Sender Groups -->
-                {% for i in range(3) %}
-                <div class="sender-group skeleton-sender">
-                    <div class="sender-header">
-                        <div class="flex items-center gap-2">
-                            <div class="h-4 w-4 bg-secondary/80 rounded"></div>
-                            <div class="h-5 bg-secondary/80 rounded w-40"></div>
-                        </div>
-                        <div class="h-5 w-5 bg-secondary/80 rounded"></div>
-                    </div>
-                    <div class="sender-emails">
-                        {% for j in range(3) %}
-                        <div class="email-row skeleton-email">
-                            <div class="flex items-center flex-1 min-w-0 mr-4">
-                                <div class="h-4 w-4 bg-secondary/80 rounded mr-3"></div>
-                                <div class="h-4 bg-secondary/80 rounded w-full max-w-md"></div>
-                            </div>
-                            <div class="h-3 bg-secondary/80 rounded w-16"></div>
-                        </div>
-                        {% endfor %}
-                    </div>
+                    <div class="h-3 bg-secondary/80 rounded w-16"></div>
                 </div>
                 {% endfor %}
             </div>
-            
-            <!-- Skeleton Loader -->
-            <div id="scan-loader" class="hidden max-w-4xl mx-auto mt-8 text-center">
-                <div class="inline-block">
-                    <svg class="animate-spin h-8 w-8 text-brand" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                </div>
-                <p class="text-muted-foreground mt-4">Scanning your inbox for subscriptions...</p>
-                <p class="text-sm text-muted-foreground mt-2">This may take a few moments</p>
-            </div>
         </div>
-        {% endif %}
+        {% endfor %}
+    </div>
+    
+    <!-- Scan Loader (initially hidden) -->
+    <div id="scan-loader" class="hidden max-w-4xl mx-auto mt-8 text-center">
+        <div class="inline-block">
+            <svg class="animate-spin h-8 w-8 text-brand" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+        </div>
+        <p class="text-muted-foreground mt-4">Scanning your inbox for subscriptions...</p>
+        <p class="text-sm text-muted-foreground mt-2">This may take a few moments</p>
     </div>
 </div>
+
 {% endblock %}
 
 {% block footer %}
-{{ super() }}
+{{ super() }} 
 {% endblock %}
 
 {% block scripts %}
 <style>
-    /* Animation styles */
-    @keyframes fadeInUp {
-        from { opacity: 0; transform: translateY(20px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
+    /* Animation styles needed for this view */
+    @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     
-    @keyframes fadeInRight {
-        from { opacity: 0; transform: translateX(20px); }
-        to { opacity: 1; transform: translateX(0); }
-    }
+    .fade-in-up { animation: fadeInUp 0.6s ease-out forwards; opacity: 0; }
+    .fade-in { animation: fadeIn 0.6s ease-out forwards; opacity: 0; }
     
-    @keyframes fadeIn {
-        from { opacity: 0; }
-        to { opacity: 1; }
-    }
-    
-    @keyframes float {
-        0% { transform: translateY(0px) rotate(1deg); }
-        50% { transform: translateY(-8px) rotate(-0.5deg); }
-        100% { transform: translateY(0px) rotate(1deg); }
-    }
-    
-    @keyframes pulse {
-        0% { transform: scale(0.8); opacity: 0.8; }
-        50% { transform: scale(1.2); opacity: 1; }
-        100% { transform: scale(0.8); opacity: 0.8; }
-    }
-    
-    /* Subtle footer text with hover effect */
-    .footer-vibe-coded {
-        display: inline-flex;
-        align-items: center;
-        border-radius: 12px;
-        font-weight: 500;
-        position: relative;
-        overflow: hidden;
-        transition: all 0.3s ease;
-        color: hsl(var(--foreground));
-        letter-spacing: 0.5px;
-        cursor: default;
-    }
-    
-    .footer-vibe-coded:hover {
-        background-clip: text;
-        -webkit-background-clip: text;
-        color: transparent;
-        background-image: linear-gradient(90deg, 
-            #ff00aa, #ff0066, #e100ff, #7f00ff, #00c3ff, #00ffe1, #ff00aa);
-        background-size: 200% auto;
-        animation: textGradientShift 3s linear infinite;
-        text-shadow: 0 0 5px rgba(255, 0, 170, 0.5);
-    }
-    
- 
-    @keyframes textGradientShift {
-        0% { background-position: 0% center; }
-        100% { background-position: 200% center; }
-    }
-        
-   
-    
- 
-    
-    @keyframes neon {
-        0%, 18%, 22%, 26%, 58%, 62%, 100% {
-            text-shadow:
-                0 0 2px #fff,
-                0 0 4px #fff,
-                0 0 8px #f80022,
-                0 0 12px #f80022;
-        }
-        20%, 24%, 60% {        
-            text-shadow: none;
-        }    
-    }
-    
-    @keyframes shine {
-        0% { left: -100%; }
-        20% { left: 100%; }
-        100% { left: 100%; }
-    }
-    
-    .fade-in-up {
-        animation: fadeInUp 0.6s ease-out forwards;
-        opacity: 0;
-    }
-    
-    .fade-in-right {
-        animation: fadeInRight 0.6s ease-out forwards;
-        opacity: 0;
-    }
-    
-    .fade-in {
-        animation: fadeIn 0.6s ease-out forwards;
-        opacity: 0;
-    }
-    
-    .animation-delay-100 {
-        animation-delay: 0.1s;
-    }
-    
-    .animation-delay-200 {
-        animation-delay: 0.2s;
-    }
-    
-    .animation-delay-300 {
-        animation-delay: 0.3s;
-    }
-    
-    .animated-card {
-        animation: float 6s ease-in-out infinite;
-    }
-    
-    .pulse-dot {
-        display: block;
-        width: 0.5rem;
-        height: 0.5rem;
-        border-radius: 9999px;
-        background-color: hsl(var(--brand));
-        animation: pulse 2s infinite;
-    }
-    
-    .bg-grid-pattern {
-        background-size: 100px 100px;
-        background-image: 
-            linear-gradient(to right, rgba(var(--foreground-rgb), 0.1) 1px, transparent 1px),
-            linear-gradient(to bottom, rgba(var(--foreground-rgb), 0.1) 1px, transparent 1px);
-    }
-    
-    /* Skeleton UI styles */
+    .animation-delay-100 { animation-delay: 0.1s; }
+    .animation-delay-200 { animation-delay: 0.2s; }
+    .animation-delay-300 { animation-delay: 0.3s; }
+
+    /* Skeleton UI styles - Copied from original index.html */
     .skeleton-sender {
         border-left: 3px solid hsl(var(--muted));
         animation: skeletonPulse 1.5s infinite ease-in-out;
     }
-    
-    .skeleton-email {
-        transition: all 0.3s ease;
-    }
-    
-    @keyframes skeletonPulse {
-        0% { opacity: 0.7; }
-        50% { opacity: 0.9; }
-        100% { opacity: 0.7; }
-    }
-    
-    /* Scan animation styles */
-    @keyframes scanAnimation {
-        0% { transform: translateY(0); opacity: 0.5; }
-        50% { transform: translateY(-20px); opacity: 1; }
-        100% { transform: translateY(0); opacity: 0.5; }
-    }
-    
-    .scan-active {
-        animation: scanAnimation 2s infinite;
-    }
+    .skeleton-email { transition: all 0.3s ease; }
+    @keyframes skeletonPulse { 0% { opacity: 0.7; } 50% { opacity: 0.9; } 100% { opacity: 0.7; } }
+
+    /* Ensure necessary base styles are available via base.html or linked CSS */
+    .sender-group { border-radius: 0 var(--radius) var(--radius) 0; background-color: hsl(var(--card)); margin-bottom: 1rem; }
+    .sender-header { padding: 0.75rem 1rem; background-color: hsla(var(--muted), 0.5); display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid hsl(var(--border)); }
+    .sender-emails { background-color: hsl(var(--card)); }
+    .email-row { padding: 0.75rem 1rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid hsl(var(--border)); }
+    .email-row:last-child { border-bottom: none; }
+    .bg-secondary\/80 { background-color: hsla(var(--secondary), 0.8); } /* Example */
+    .bg-secondary\/60 { background-color: hsla(var(--secondary), 0.6); }
+
 </style>
 
 <script>
-    // Function to simulate scanning animation and redirect to scan page
+    // Function to handle scan button click and show loader
     function startScan() {
-        // Hide the skeleton list and show the loader
         const skeletonList = document.getElementById('skeleton-list');
         const scanLoader = document.getElementById('scan-loader');
         const scanButton = document.getElementById('scan-button');
@@ -376,34 +108,39 @@
         if (skeletonList && scanLoader && scanButton) {
             // Disable the button and change text
             scanButton.classList.add('opacity-50', 'cursor-not-allowed');
-            scanButton.innerText = 'Scanning...';
-            
+            scanButton.disabled = true;
+            // Add spinner to button (assuming base.html provides setLoading/hideLoading)
+            // If not, implement spinner addition here
+            const originalContent = scanButton.innerHTML;
+            scanButton.innerHTML = `<span class="spinner"></span> Scanning...`; 
+            scanButton.dataset.originalContent = originalContent; // Store original content
+
             // Fade out the skeleton list
             skeletonList.style.transition = 'opacity 0.5s ease';
             skeletonList.style.opacity = '0';
             
-            // Show the loader with delay
+            // Show the loader after fade out
             setTimeout(() => {
                 skeletonList.style.display = 'none';
                 scanLoader.classList.remove('hidden');
                 scanLoader.classList.add('fade-in');
             }, 500);
             
-            // Let the animation run for a moment before redirecting
-            // This is just for visual effect to show the loading state
-            return true; // Allow the normal link navigation to proceed
+            // Allow the form submission (link navigation) to proceed
+            return true; 
         }
         
+        // Fallback if elements not found
         return true;
     }
-    
-    function setLoading(buttonId, loadingText) {
-        const button = document.getElementById(buttonId);
-        if (button) {
-            button.disabled = true;
-            button.classList.add('opacity-75');
-            button.textContent = loadingText;
-        }
-    }
+
+    // Add simple spinner keyframes if not globally available
+    const styleSheet = document.createElement("style")
+    styleSheet.type = "text/css"
+    styleSheet.innerText = `
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .spinner { border: 2px solid hsla(var(--brand), 0.2); width: 1em; height: 1em; border-radius: 50%; border-left-color: hsl(var(--brand)); animation: spin 1s ease infinite; display: inline-block; vertical-align: -0.125em; margin-right: 0.5em; }
+    `;
+    document.head.appendChild(styleSheet);
 </script>
 {% endblock %} 

@@ -21,7 +21,7 @@ from email.mime.text import MIMEText
 # Import Blueprints and utils
 from .auth import auth_bp
 from .scan import scan_bp
-from . import utils # Import utils to access get_gmail_service for the index route
+from . import utils # Import utils to access get_gmail_service
 from . import config # Import the config module
 
 # Explicitly tell Flask the template folder is in the root directory
@@ -30,7 +30,11 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 template_dir = os.path.join(project_root, 'templates')
 static_dir = os.path.join(project_root, 'public/static')
 
-app = Flask(__name__, template_folder=template_dir, static_folder=static_dir, static_url_path='/static')
+# NOTE: static_folder is handled by vercel.json now, but keep for local dev?
+# For Vercel, static files are served directly based on vercel.json, not via Flask.
+# Setting static_folder here might be useful for local `flask run` but potentially confusing.
+# Let's remove it to rely solely on Vercel's handling for static files.
+app = Flask(__name__, template_folder=template_dir)
 
 # --- Configuration ---
 # Set secret key directly here using environment variable
@@ -43,7 +47,7 @@ print(f"--- Flask App Initialized. Using Secret Key: {app.secret_key[:5]}...{app
 
 # --- Update Config based on Environment Variable ---
 # Read the debug logging flag *after* app init, ensuring env vars are loaded
-config.DEBUG_LOGGING = os.getenv('FLASK_DEBUG_MODE', 'False').lower() == 'true'
+# config.DEBUG_LOGGING = os.getenv('FLASK_DEBUG_MODE', 'False').lower() == 'true' # Use utils.should_log()
 if utils.should_log():
     print("--- FLASK_DEBUG_MODE is TRUE --- Verbosely logging startup config...")
 # --- End Update Config ---
@@ -55,40 +59,11 @@ if utils.should_log():
     print(f"--- Using REDIRECT_URI from config: {config.REDIRECT_URI} ---")
     print(f"--- Using MOCK_API from config: {config.MOCK_API} ---")
 
-# Google API Scopes
-SCOPES = ['https://www.googleapis.com/auth/gmail.readonly'] # Read, modify (for archiving), send
+# Google API Scopes are defined in config.py
+# Credentials file path is defined in config.py
 
-# Credentials file path (relative to project root)
-CREDENTIALS_FILE = 'credentials.json' 
-
-# Mock API Flag
-MOCK_API = False 
-
-# Scan limit
-MAX_SCAN_EMAILS = 50 
-
-# --- Vercel Specific Configuration ---
-# Prioritize the production URL for OAuth consistency, fall back to deployment URL, then localhost
-PROD_URL = os.environ.get('VERCEL_PROJECT_PRODUCTION_URL')
-DEPLOY_URL = os.environ.get('VERCEL_URL')
-VERCEL_ENV = os.environ.get('VERCEL_ENV', 'development') # Get Vercel environment type
-
-if PROD_URL and VERCEL_ENV == 'production':
-    # Use HTTPS for the production domain
-    BASE_URL = f"https://{PROD_URL}"
-    if utils.should_log(): print(f"--- Using Production URL (HTTPS): {BASE_URL} ---")
-elif DEPLOY_URL:
-    # Use HTTP for vercel dev (localhost) or preview deployments
-    BASE_URL = f"http://{DEPLOY_URL}"
-    if utils.should_log(): print(f"--- Using Deployment URL (HTTP): {BASE_URL} ---")
-else:
-    # Fallback for truly local execution (e.g. `python api/index.py`)
-    BASE_URL = 'http://127.0.0.1:5001' # Default for local development
-    if utils.should_log(): print(f"--- Using Localhost Fallback URL (HTTP): {BASE_URL} ---")
-
-# Adjust REDIRECT_URI to include the auth blueprint prefix
-REDIRECT_URI = f'{BASE_URL}/auth/oauth2callback'
-if utils.should_log(): print(f"--- Final REDIRECT_URI: {REDIRECT_URI} ---") # Debugging
+# --- Vercel Specific Configuration (Now mainly in config.py) ---
+if utils.should_log(): print(f"--- Final REDIRECT_URI from config: {config.REDIRECT_URI} ---")
 # --- End Vercel Specific Configuration ---
 
 # --- Register Blueprints ---
@@ -96,21 +71,22 @@ app.register_blueprint(auth_bp)
 app.register_blueprint(scan_bp)
 
 # --- Main Routes (defined in the main app file) ---
-@app.route('/')
-def index():
-    """Home page: Check credentials and show scan button or login."""
-    # Use get_gmail_service from utils
-    service = utils.get_gmail_service()
-    authenticated = bool(service)
-    if utils.should_log(): print(f"Index route: authenticated={authenticated}")
-    return render_template('index.html', authenticated=authenticated)
 
-@app.route('/privacy')
-def privacy():
-    """Privacy Policy page."""
+# Removed the '/' and '/privacy' routes as they are now served statically by Vercel
+
+@app.route('/dashboard')
+def dashboard():
+    """Dashboard page shown after successful login."""
     service = utils.get_gmail_service()
-    authenticated = bool(service)
-    return render_template('privacy.html', authenticated=authenticated)
+    if not service:
+        flash("Please log in to view the dashboard.", "warning")
+        return redirect(url_for('auth.login')) # Redirect to login if not authenticated
+
+    # Render the template previously used for the authenticated part of index
+    # This template now assumes user is authenticated
+    if utils.should_log(): print("Rendering dashboard (templates/index.html) for authenticated user.")
+    return render_template('index.html', authenticated=True)
+
 
 # --- Main Execution (for local non-Vercel CLI development) ---
 if __name__ == '__main__':
@@ -137,10 +113,11 @@ if __name__ == '__main__':
         if utils.should_log(): print(f"--- CLI Override: Using Secret Key: {app.secret_key[:5]}... ---")
 
     # Reconstruct BASE_URL and REDIRECT_URI ONLY if redirect-host is provided
+    # This affects config values if running locally with override
     if args.redirect_host:
         local_base_url = f'http://{args.redirect_host}:{args.port}'
-        config.REDIRECT_URI = f'{local_base_url}/auth/oauth2callback'
-        config.BASE_URL = local_base_url
+        config.BASE_URL = local_base_url # Update config
+        config.REDIRECT_URI = f'{local_base_url}/auth/oauth2callback' # Update config
         if utils.should_log():
             print(f"--- CLI Override: Base URL: {config.BASE_URL} ---")
             print(f"--- CLI Override: Redirect URI: {config.REDIRECT_URI} ---")
@@ -153,7 +130,14 @@ if __name__ == '__main__':
         print(f"Redirect URI: {config.REDIRECT_URI}")
         print(f"Flask Secret Key Used: {app.secret_key[:5]}...{app.secret_key[-5:] if len(app.secret_key) > 10 else ''}")
         print(f"Debug Mode: {args.debug}")
-        print(f"Running on: http://0.0.0.0:{args.port} (Accessible via {config.BASE_URL})")
+        print(f"Running on: http://0.0.0.0:{args.port} (Accessible via {config.BASE_URL or 'http://127.0.0.1:' + str(args.port)}) ")
         print("---------------------------------------------")
+
+    # For local development, tell Flask where static files are if not using Vercel
+    # Check if VERCEL env var is NOT set to determine if truly local
+    if not os.environ.get('VERCEL'):
+        print("--- Local Run Detected (no VERCEL env var): Configuring static folder for Flask --- ")
+        app.static_folder = static_dir
+        app.static_url_path = '/static'
 
     app.run(host='0.0.0.0', port=args.port, debug=args.debug) 
