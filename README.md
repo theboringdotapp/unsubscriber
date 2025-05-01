@@ -133,3 +133,30 @@ Contributions are welcome! Please feel free to submit a Pull Request or open an 
 ## License
 
 [MIT License](LICENSE) (Assuming MIT - add a LICENSE file if needed)
+
+## Vibe Coding Analytics
+
+This project was developed 100% using Vibe Coding (AI-assisted development) with almost no human-written code.
+
+### AI Models Used
+- Claude-3.7-sonnet
+- Gemini 2.5 Pro
+
+### Tools Used
+- [Cursor.sh](https://cursor.sh) - AI-powered code editor
+- [Claude Code CLI](https://claude.ai/code) - Command line coding assistant
+
+### Development Costs
+- $20.00 - Cursor subscription (used all 500 fast requests)
+- $13.81 - Extra Cursor credits
+- $21.42 - Claude Code credits (used for complex tasks)
+- **Total: $55.23**
+
+### Time Metrics
+- Total time spent: 11h 29m (690.0 minutes)
+- Number of sessions: 22
+- Total commits: 75
+- Average session length: 31.4 minutes
+- Average time per commit: 9.2 minutes
+
+*Time is calculated based on the commit history, so not 100% accurate.
