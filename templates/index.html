@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}Unsubscriber Dashboard{% endblock %}
+{% block title %}Unsubscriber - Inbox{% endblock %}
 
 {% block content %}
 
@@ -20,10 +20,10 @@
     </div>
     
     <!-- Skeleton Subscription List (Placeholder for initial view) -->
-    <div id="skeleton-list" class="space-y-4 max-w-4xl mx-auto fade-in-up animation-delay-300">
-        <!-- Skeleton Sender Groups -->
+    <div id="skeleton-list" class="space-y-4 max-w-4xl mx-auto fade-in-up animation-delay-300 skeleton-container">
+        <!-- Skeleton Sender Groups - Show fewer on mobile -->
         {% for i in range(3) %}
-        <div class="sender-group skeleton-sender">
+        <div class="sender-group skeleton-sender {% if i > 1 %}hidden md:block{% endif %}">
             <div class="sender-header">
                 <div class="flex items-center gap-2">
                     <div class="h-4 w-4 bg-muted rounded"></div>
@@ -33,7 +33,7 @@
             </div>
             <div class="sender-emails">
                 {% for j in range(3) %}
-                <div class="email-row skeleton-email">
+                <div class="email-row skeleton-email {% if j > 1 and i == 0 %}hidden sm:flex{% endif %}">
                     <div class="flex items-center flex-1 min-w-0 mr-4">
                         <div class="h-4 w-4 bg-muted rounded mr-3"></div>
                         <div class="h-4 bg-muted rounded w-full max-w-md"></div>
@@ -44,6 +44,9 @@
             </div>
         </div>
         {% endfor %}
+        
+        <!-- Fade out gradient at the bottom on mobile -->
+        <div class="skeleton-fade md:hidden"></div>
     </div>
     
     <!-- Scan Loader div removed -->
@@ -58,4 +61,24 @@
 
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/scan.js') }}"></script>
+<style>
+    /* Mobile-specific styles for skeleton list */
+    @media (max-width: 768px) {
+        .skeleton-container {
+            position: relative;
+            max-height: 300px;
+            overflow: hidden;
+        }
+        
+        .skeleton-fade {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 100px;
+            background: linear-gradient(to bottom, transparent, hsl(var(--background)));
+            pointer-events: none;
+        }
+    }
+</style>
 {% endblock %} 

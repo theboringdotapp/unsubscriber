@@ -84,7 +84,9 @@ def login():
     service = utils.get_gmail_service()
     requested_scope_type = request.args.get('scope') # Get scope early
     if service and requested_scope_type != 'modify':
-        if utils.should_log(): print(f"User already authenticated (scopes: {service.credentials.scopes if service.credentials else 'N/A'}) and not requesting modify scope. Redirecting to dashboard.")
+        # The service object doesn't have a credentials attribute, so get creds directly
+        creds = utils.load_credentials()
+        if utils.should_log(): print(f"User already authenticated (scopes: {creds.scopes if creds and hasattr(creds, 'scopes') else 'N/A'}) and not requesting modify scope. Redirecting to dashboard.")
         return redirect('/dashboard')
     # --- End check ---
     
