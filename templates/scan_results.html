@@ -94,6 +94,7 @@
                                                value="{{ email.id }}" 
                                                class="email-checkbox form-checkbox h-4 w-4 text-brand border-border rounded focus:ring-brand mr-3" 
                                                data-sender="{{ clean_sender|e }}"
+                                               {% if email.body_link %}data-body-link="{{ email.body_link }}"{% endif %}
                                                onclick="event.stopPropagation(); handleEmailCheckboxClick(this);"></input>
                                         <span class="email-subject text-sm text-foreground truncate" title="{{ email.subject|e }}">{{ email.subject }}</span>
                                     </div>

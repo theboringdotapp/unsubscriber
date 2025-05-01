@@ -17,6 +17,81 @@ function setEndpoints(unsubUrl, archUrl) {
 }
 
 /**
+ * Saves email details to session storage
+ */
+function saveEmailDetailsToStorage(details) {
+  try {
+    sessionStorage.setItem("emailDetails", JSON.stringify(details));
+  } catch (e) {
+    console.error("Failed to save email details to session storage:", e);
+  }
+}
+
+/**
+ * Gets email details from session storage
+ */
+function getEmailDetailsFromStorage() {
+  try {
+    const details = sessionStorage.getItem("emailDetails");
+    return details ? JSON.parse(details) : {};
+  } catch (e) {
+    console.error("Failed to get email details from session storage:", e);
+    return {};
+  }
+}
+
+/**
+ * Initialize data storage for the current page's emails
+ * Called on page load
+ */
+function initializeEmailDataStore() {
+  const emailRows = document.querySelectorAll(".email-row");
+  const storedDetails = getEmailDetailsFromStorage();
+
+  emailRows.forEach((row) => {
+    const emailId = row.id.replace("email-", "");
+    const checkbox = row.querySelector(".email-checkbox");
+    if (!checkbox) return;
+
+    const sender = checkbox.getAttribute("data-sender");
+    if (!sender) return;
+
+    // Extract link data - first from direct attributes
+    let link = null;
+    let bodyLink = null;
+
+    // Try to get links from the row
+    const linkElements = row.querySelectorAll(
+      "a.unsubscribe-link, a.email-link"
+    );
+    if (linkElements.length > 0) {
+      link = linkElements[0].getAttribute("href");
+    }
+
+    // Check for data attributes that might contain body links
+    if (checkbox.hasAttribute("data-body-link")) {
+      bodyLink = checkbox.getAttribute("data-body-link");
+    }
+
+    // Store or update email details
+    storedDetails[emailId] = {
+      id: emailId,
+      sender: sender,
+      link: link,
+      type: link ? (link.startsWith("mailto:") ? "mailto" : "http") : null,
+      body_link: bodyLink,
+    };
+  });
+
+  // Save the updated details to storage
+  saveEmailDetailsToStorage(storedDetails);
+  console.log(`Initialized data for ${emailRows.length} emails`);
+}
+
+// Call the initialize function when the page loads
+document.addEventListener("DOMContentLoaded", initializeEmailDataStore);
+
+/**
  * Main function to perform unsubscribe for selected emails
  */
 async function performUnsubscribe() {
@@ -251,8 +326,28 @@ async function performUnsubscribe() {
           }
         });
 
-        // Update UI to show manual action required with link
-        updateSenderStatus(sender, "manual", "http");
+        // Check for body links in stored email details
+        let bodyLink = null;
+        for (const emailId of senderEmailIds) {
+          // Try to get body link from stored data
+          if (
+            storedEmailDetails[emailId]?.body_link &&
+            storedEmailDetails[emailId].body_link !== link
+          ) {
+            bodyLink = storedEmailDetails[emailId].body_link;
+            console.log(
+              `Found alternative body link for ${sender}: ${bodyLink}`
+            );
+            break;
+          }
+        }
+
+        // Update UI to show manual action required with appropriate link
+        if (bodyLink) {
+          updateSenderStatus(sender, "manual", "http", bodyLink);
+        } else {
+          updateSenderStatus(sender, "manual", "http");
+        }
       }
 
       window.currentSenderIndex++;
@@ -701,6 +796,88 @@ function removeProcessedEmails() {
   }
 
   closeModal(); // This calls updateActionBar which reads the (now empty) storage
+}
+
+/**
+ * Update the status of a sender in the progress list
+ */
+function updateSenderStatus(sender, status, linkType = null, bodyLink = null) {
+  const sendersList = document.getElementById("senders-progress-list");
+  if (!sendersList) return;
+
+  // Find or create the sender item
+  let senderItem = document.querySelector(
+    `.sender-status-item[data-sender="${sender}"]`
+  );
+
+  if (!senderItem) {
+    senderItem = document.createElement("li");
+    senderItem.className =
+      "sender-status-item flex items-center justify-between py-1 border-b border-base-300 last:border-0";
+    senderItem.setAttribute("data-sender", sender);
+
+    // Truncate sender name if too long
+    const displayName =
+      sender.length > 25 ? sender.substring(0, 22) + "..." : sender;
+
+    senderItem.innerHTML = `
+      <span class="sender-name text-sm">${displayName}</span>
+      <span class="sender-status flex items-center">
+        <span class="status-indicator mr-2"></span>
+        <span class="status-text text-xs"></span>
+      </span>
+    `;
+
+    sendersList.appendChild(senderItem);
+  }
+
+  // Update the status indicator and text
+  const statusIndicator = senderItem.querySelector(".status-indicator");
+  const statusText = senderItem.querySelector(".status-text");
+
+  // Remove all status classes
+  statusIndicator.className = "status-indicator mr-2";
+
+  // Add appropriate status class and text
+  if (status === "processing") {
+    statusIndicator.classList.add("animate-pulse", "text-warning");
+    statusIndicator.innerHTML =
+      '<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>';
+    statusText.textContent = "Processing...";
+    statusText.className = "status-text text-xs text-muted-foreground";
+  } else if (status === "completed") {
+    statusIndicator.classList.add("text-success");
+    statusIndicator.innerHTML =
+      '<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>';
+    statusText.textContent = "Done";
+    statusText.className = "status-text text-xs text-success";
+  } else if (status === "manual") {
+    statusIndicator.classList.add("text-warning");
+    statusIndicator.innerHTML =
+      '<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>';
+    statusText.textContent = "Manual action";
+    statusText.className = "status-text text-xs text-warning";
+
+    // If manual action is required and we have a link type, show a link
+    if (linkType === "http" || linkType === "body_link") {
+      // If we have a body link that differs from header link, show it as alternative
+      if (bodyLink) {
+        const linkNote = senderItem.querySelector(".link-note");
+        if (!linkNote) {
+          const noteElem = document.createElement("div");
+          noteElem.className = "link-note text-xs mt-1";
+          noteElem.innerHTML = `Try this alternative link: <a href="${bodyLink}" target="_blank" class="text-brand hover:underline">Open</a>`;
+          senderItem.appendChild(noteElem);
+        }
+      }
+    }
+  } else if (status === "error") {
+    statusIndicator.classList.add("text-destructive");
+    statusIndicator.innerHTML =
+      '<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>';
+    statusText.textContent = "Error";
+    statusText.className = "status-text text-xs text-destructive";
+  }
 }
 
 // --- Global functions ---

@@ -62,8 +62,14 @@ def _get_mock_message_details(msg_id):
 # --- Helper Functions --- 
 
 def find_unsubscribe_links(message_data):
-    """Parses email headers for unsubscribe links with enhanced header support."""
-    unsubscribe_info = {"header_link": None, "mailto_link": None}
+    """Parses email for unsubscribe links from headers and body"""
+    unsubscribe_info = {
+        "header_link": None, 
+        "mailto_link": None,
+        "body_link": None,  # New field for body links
+        "body_link_score": 0  # Score to prioritize better body links
+    }
+    
     try:
         headers = message_data.get('payload', {}).get('headers', [])
         
@@ -84,27 +90,122 @@ def find_unsubscribe_links(message_data):
                     if unsubscribe_info["header_link"]:
                         break
         
-        # If no link found, check message body for common patterns (snippet in metadata)
-        if not unsubscribe_info["header_link"] and not unsubscribe_info["mailto_link"]:
-            # Try to extract from List-ID or other headers
-            list_id = None
+        # Always parse body for links, regardless of whether we found header links
+        try:
+            # Get message body parts
+            parts = message_data.get('payload', {}).get('parts', [])
+            if not parts and message_data.get('payload'):
+                parts = [message_data.get('payload')]
+                
+            for part in parts:
+                if part.get('mimeType') == 'text/html':
+                    # Get and decode body data
+                    data = part.get('body', {}).get('data', '')
+                    if data:
+                        body_html = base64.urlsafe_b64decode(data).decode('utf-8')
+                        
+                        # More comprehensive search for unsubscribe links with context
+                        # First look for links with unsubscribe text in the anchor text itself
+                        unsubscribe_anchors = re.findall(r'<a\s+[^>]*href=["\'](https?://[^"\']+)["\'][^>]*>([^<]+)</a>', body_html, re.IGNORECASE)
+                        
+                        best_score = 0
+                        best_link = None
+                        
+                        # Check anchor text links first
+                        for url, anchor_text in unsubscribe_anchors:
+                            score = 0
+                            anchor_lower = anchor_text.lower()
+                            
+                            # Score based on anchor text quality
+                            if 'unsubscribe' in anchor_lower:
+                                score += 10
+                            elif 'opt out' in anchor_lower or 'opt-out' in anchor_lower:
+                                score += 8
+                            elif 'cancel' in anchor_lower and ('subscription' in anchor_lower or 'newsletter' in anchor_lower):
+                                score += 7
+                            elif 'preferences' in anchor_lower or 'manage' in anchor_lower:
+                                score += 5
+                            
+                            # Score based on URL quality
+                            url_lower = url.lower()
+                            if 'unsubscribe' in url_lower:
+                                score += 5
+                            elif 'opt-out' in url_lower or 'optout' in url_lower:
+                                score += 4
+                            elif 'preference' in url_lower:
+                                score += 3
+                                
+                            # Penalize likely webhook or tracking URLs
+                            if 'webhook' in url_lower or 'callback' in url_lower or 'track' in url_lower:
+                                score -= 5
+                            
+                            # If this link is better than what we've found so far
+                            if score > best_score:
+                                best_score = score
+                                best_link = url
+                        
+                        # If we didn't find a good link with anchor text, try the older regex patterns
+                        if best_score < 5:
+                            unsubscribe_patterns = [
+                                r'href=["\'](https?://[^"\']*unsubscribe[^"\']*)["\']',
+                                r'href=["\'](https?://[^"\']*opt.?out[^"\']*)["\']',
+                                r'href=["\'](https?://[^"\']*preferences[^"\']*)["\']'
+                            ]
+                            
+                            for pattern in unsubscribe_patterns:
+                                matches = re.findall(pattern, body_html, re.IGNORECASE)
+                                if matches:
+                                    best_link = matches[0]
+                                    best_score = 2  # Lower priority than anchor text links
+                                    break
+                        
+                        # Update body link if we found a good one
+                        if best_link and best_score > 0:
+                            unsubscribe_info["body_link"] = best_link
+                            unsubscribe_info["body_link_score"] = best_score
+        except Exception as e:
+            print(f"Error parsing body for unsubscribe link: {e}")
             
-            for header in headers:
-                if header['name'].lower() == 'list-id':
-                    list_id = header['value']
-            
-            # Future enhancement: construct unsubscribe URLs for known ESPs
-    
     except Exception as e:
         print(f"Error parsing message for unsubscribe link: {e}")
 
-    # Return links in order of preference
-    if unsubscribe_info["header_link"]: 
-        return unsubscribe_info["header_link"], "header_http"
-    elif unsubscribe_info["mailto_link"]: 
-        return unsubscribe_info["mailto_link"], "header_mailto"
-    else: 
-        return None, None
+    # Choose the primary link based on improved logic
+    primary_link = None
+    link_type = None
+    
+    # If header link is a webhook URL and we have a good body link, prefer the body link
+    header_link = unsubscribe_info["header_link"]
+    body_link = unsubscribe_info["body_link"]
+    body_score = unsubscribe_info["body_link_score"]
+    
+    # Check if header link seems to be a webhook or tracking URL
+    header_is_webhook = False
+    if header_link:
+        header_lower = header_link.lower()
+        if ('webhook' in header_lower or 'callback' in header_lower or 
+            'track' in header_lower or 'api.' in header_lower or 
+            ('click' in header_lower and 'unsubscribe' not in header_lower)):
+            header_is_webhook = True
+    
+    # Decision logic
+    if body_link and (body_score >= 7 or (header_is_webhook and body_score > 0)):
+        # Use body link if it's high quality or if header is webhook and body is decent
+        primary_link = body_link
+        link_type = "body_link"
+    elif header_link:
+        # Fall back to header link
+        primary_link = header_link
+        link_type = "header_http"
+    elif body_link:
+        # Use body link even if lower quality when no header link exists
+        primary_link = body_link
+        link_type = "body_link"
+    elif unsubscribe_info["mailto_link"]:
+        # Last resort is mailto
+        primary_link = unsubscribe_info["mailto_link"]
+        link_type = "header_mailto"
+    
+    return primary_link, link_type, body_link
 
 def parse_unsubscribe_header_value(value, unsubscribe_info):
     """Helper function to parse unsubscribe header values."""
@@ -276,18 +377,12 @@ def scan_emails():
                         full_message['internalDate'] = str(int(datetime.now().timestamp() * 1000))
                     else:
                         full_message = service.users().messages().get(
-                            userId='me', id=msg_id, format='metadata',
-                            # Request InternalDate along with other headers
-                            # Add more unsubscribe-related headers to check
-                            metadataHeaders=[
-                                'List-Unsubscribe', 'List-Unsubscribe-Post', 'From', 'Subject',
-                                'X-List-Unsubscribe', 'List-Id', 'Feedback-ID'
-                            ] 
+                            userId='me', id=msg_id, format='full'  # Change from 'metadata' to 'full'
                         ).execute()
                     
-                    unsubscribe_link, link_type = find_unsubscribe_links(full_message)
+                    link, link_type, body_link = find_unsubscribe_links(full_message)
                     
-                    if unsubscribe_link:
+                    if link:
                         headers = full_message.get('payload', {}).get('headers', [])
                         sender = next((h['value'] for h in headers if h['name'].lower() == 'from'), 'Unknown Sender')
                         subject = next((h['value'] for h in headers if h['name'].lower() == 'subject'), 'No Subject')
@@ -317,9 +412,10 @@ def scan_emails():
                             "date": email_date_formatted,
                             # We might not need link/type/full_sender per email anymore if handling unsubscribe per sender
                             # Keep them for now if needed elsewhere, but check later
-                            "link": unsubscribe_link, 
+                            "link": link, 
                             "type": link_type, 
-                            "full_sender": sender
+                            "full_sender": sender,
+                            "body_link": body_link  # Add body link field
                         }
                         
                         # Add to the dictionary using the new structure
@@ -327,7 +423,7 @@ def scan_emails():
                             found_subscriptions[clean_sender] = {
                                 'emails': [email_data],
                                 # Store the first found unsubscribe link as the primary for the sender group
-                                'unsubscribe_link': unsubscribe_link 
+                                'unsubscribe_link': link 
                             }
                         else:
                             found_subscriptions[clean_sender]['emails'].append(email_data)
@@ -454,7 +550,7 @@ def unsubscribe_and_archive():
                 ]
             ).execute()
             
-            link, link_type = find_unsubscribe_links(full_message)
+            link, link_type, body_link = find_unsubscribe_links(full_message)
             
             # We're only interested in mailto links here, as HTTP links are handled client-side
             if link and link_type == 'header_mailto':
