@@ -3,10 +3,45 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Unsubscriber by theboring.app</title>
+    <title>Email Unsubscriber</title>
+    <meta name="description" content="Remove all email subscriptions for free.">
+
+    <!-- Facebook Meta Tags -->
+    <meta property="og:url" content="https://unsubscriber.theboring.app">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Email Unsubscriber">
+    <meta property="og:description" content="Remove all email subscriptions for free.">
+    <meta property="og:image" content="https://opengraph.b-cdn.net/production/images/c0cb977a-ed22-4027-9a59-355b397c8f50.jpg?token=16trzNHa7ceCBvlkAM2zf-awXBcg_jaVP32YaeQ2YOc&height=630&width=1200&expires=33282112639">
+
+    <!-- Twitter Meta Tags -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta property="twitter:domain" content="unsubscriber.theboring.app">
+    <meta property="twitter:url" content="https://unsubscriber.theboring.app">
+    <meta name="twitter:title" content="Email Unsubscriber">
+    <meta name="twitter:description" content="Remove all email subscriptions for free.">
+    <meta name="twitter:image" content="https://opengraph.b-cdn.net/production/images/c0cb977a-ed22-4027-9a59-355b397c8f50.jpg?token=16trzNHa7ceCBvlkAM2zf-awXBcg_jaVP32YaeQ2YOc&height=630&width=1200&expires=33282112639">
+    
     <link rel="icon" href="/static/img/favicon.png" type="image/png">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+    
+    <!-- Preconnect to critical domains -->
+    <link rel="preconnect" href="https://cdn.tailwindcss.com" crossorigin>
+    <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+    
+    <!-- Load critical CSS first -->
+    <link rel="stylesheet" href="/static/css/styles.css">
+    
+    <!-- Defer non-critical CSS -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
+    <!-- Fallback for browsers that don't support onload -->
+    <noscript>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+    </noscript>
+    
+    <!-- Move Tailwind to end of body or load with defer -->
+    <script defer src="https://cdn.tailwindcss.com"></script>
+    
     <script>
         // On page load or when changing themes, best to add inline in `head` to avoid FOUC
         if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
@@ -15,11 +50,8 @@
             document.documentElement.classList.remove('dark')
         }
     </script>
-    <!-- Link to static CSS file -->
-    <link rel="stylesheet" href="/static/css/styles.css">
-    <!-- <style> block removed -->
     
-    <!-- Umami Analytics -->
+    <!-- Umami Analytics - deferred -->
     <script defer src="https://cloud.umami.is/script.js" data-website-id="2ae0d0a0-78ae-4c42-9f01-be8104391628"></script>
 </head>
 <body class="min-h-screen flex flex-col bg-background text-foreground">
