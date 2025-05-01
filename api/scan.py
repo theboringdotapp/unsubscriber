@@ -248,13 +248,17 @@ def scan_emails():
              list_response = _get_mock_message_list(page_token=page_token)
         else:
             # Combine specific header search with keyword fallback
-            keyword_query = ' OR '.join(config.UNSUBSCRIBE_SEARCH_TERMS)
+            # Add Spanish and Portuguese terms (with proper quoting for multi-word terms)
+            spanish_portuguese_terms = ['"cancelar suscripción"', '"desuscribirse"', '"darse de baja"', 
+                                       '"cancelar inscrição"', '"descadastrar"', '"desinscrever"']
+            all_search_terms = config.UNSUBSCRIBE_SEARCH_TERMS + spanish_portuguese_terms
+            keyword_query = ' OR '.join(all_search_terms)
             combined_query = f"has:list-unsubscribe OR ({keyword_query})"
             if utils.should_log(): print(f"--- SCAN ROUTE: Using combined query: {combined_query} ---")
 
             list_response = service.users().messages().list(
                 userId='me',
-                maxResults=20,
+                maxResults=50,  # Increased from 20 to 50
                 pageToken=page_token,
                 q=combined_query, # Use the combined query
                 labelIds=['INBOX']

@@ -24,6 +24,18 @@
             <p class="text-muted-foreground mb-6">We scanned the most recent emails in your inbox but didn't find any with obvious unsubscribe links in the headers.</p>
             <p class="text-xs text-muted-foreground mb-4">This can happen if emails use non-standard unsubscribe methods or if you haven't received many subscription emails recently.</p>
             <a href="/" class="btn btn-outline btn-sm mt-4 focus-ring">Back Home</a>
+            
+            {% if next_page_token %}
+            <div class="mt-6 border-t border-border pt-6">
+                <p class="text-sm text-muted-foreground mb-4">Would you like to scan more emails?</p>
+                <a href="{{ url_for('scan.scan_emails', token=next_page_token) }}"
+                   id="scan-more-button"
+                   onclick="setLoading('scan-more-button', 'Scanning More...')"
+                   class="btn btn-outline btn-md focus-ring btn-pulse">
+                    Scan More Emails
+                </a>
+            </div>
+            {% endif %}
         </div>
     {% elif subscriptions %}
         <form id="unsubscribe-form">
