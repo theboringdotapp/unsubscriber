@@ -66,7 +66,8 @@ function updateStorageForItem(emailId, isSelected) {
               .replace(/\s+/g, "-")
               .replace(/[<>]/g, "")
               .replace(/@/g, "-")
-              .replace(/\./g, "-");
+              .replace(/\./g, "-")
+              .replace(/['"`()]/g, ""); // Remove special characters
 
             const senderGroup = document.getElementById(
               `sender-group-${senderId}`

@@ -152,6 +152,9 @@ function toggleSenderSelection(senderId) {
     senderId = JSON.stringify(senderId).replace(/^"|"$/g, "");
   }
 
+  // Make sure special characters are properly handled
+  senderId = senderId.replace(/['"`()]/g, ""); // Remove apostrophes, quotes, and parentheses
+
   const senderCheckbox = document.getElementById(`select-sender-${senderId}`);
   if (senderCheckbox) {
     // Programmatically toggle the checkbox state
@@ -252,7 +255,8 @@ function updateSenderCheckboxState(emailCheckbox) {
     .replace(/\s+/g, "-")
     .replace(/[<>]/g, "")
     .replace(/@/g, "-")
-    .replace(/\./g, "-");
+    .replace(/\./g, "-")
+    .replace(/['"`()]/g, ""); // Remove apostrophes, quotes, and parentheses
 
   const senderCheckbox = document.getElementById(`select-sender-${senderId}`);
   if (!senderCheckbox) return;
@@ -311,7 +315,8 @@ function updateAllSenderCheckboxes() {
       .replace(/\s+/g, "-")
       .replace(/[<>]/g, "")
       .replace(/@/g, "-")
-      .replace(/\./g, "-");
+      .replace(/\./g, "-")
+      .replace(/['"`()]/g, ""); // Remove apostrophes, quotes, and parentheses
     const senderGroup = document.getElementById(`sender-group-${senderId}`);
 
     if (checkedEmailCheckboxes.length === 0) {

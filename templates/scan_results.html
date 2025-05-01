@@ -55,7 +55,7 @@
                     </a>
                 </div>
                 {% for clean_sender, data in subscriptions.items() %}
-                    {% set sender_id = clean_sender|replace(' ', '-')|replace('<', '')|replace('>', '')|replace('@', '-')|replace('.', '-') %}
+                    {% set sender_id = clean_sender|replace(' ', '-')|replace('<', '')|replace('>', '')|replace('@', '-')|replace('.', '-')|replace("'", "")|replace('"', "")|replace('(', "")|replace(')', "") %}
                     {% set color_index = loop.index0 % colors|length %}
                     {% set sender_color_hsl = colors[color_index] %}
                     <div class="sender-group" 
