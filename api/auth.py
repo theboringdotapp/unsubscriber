@@ -80,24 +80,26 @@ def get_google_auth_flow(scopes_list=None):
 @auth_bp.route('/login')
 def login():
     """Initiates the Google OAuth flow. Handles initial login and permission upgrades."""
-    # --- Check if already authenticated --- 
+    # --- Check if already authenticated AND not requesting scope upgrade ---
     service = utils.get_gmail_service()
-    if service:
-        if utils.should_log(): print("User already authenticated, redirecting to dashboard.")
+    requested_scope_type = request.args.get('scope') # Get scope early
+    if service and requested_scope_type != 'modify':
+        if utils.should_log(): print(f"User already authenticated (scopes: {service.credentials.scopes if service.credentials else 'N/A'}) and not requesting modify scope. Redirecting to dashboard.")
         return redirect('/dashboard')
-    # --- End check --- 
-        
-    # If not authenticated, proceed with login flow
-    utils.clear_credentials() # Clear any old credentials
-    session.pop('oauth_state', None) # Clear old state if any
-    session.pop('post_auth_redirect', None) # Clear old redirect target
-    if utils.should_log(): print("Starting login flow...")
+    # --- End check ---
+    
+    # If not authenticated OR requesting modify scope, proceed with login flow
+    # Clear creds only if it's a fresh login, not a scope upgrade for an existing session?
+    # Let's keep clear_credentials for simplicity for now, Google handles re-consent.
+    utils.clear_credentials() 
+    session.pop('oauth_state', None) 
+    session.pop('post_auth_redirect', None)
+    if utils.should_log(): print("Proceeding with OAuth flow (New Login or Scope Upgrade)...")
 
-    requested_scope_type = request.args.get('scope')
-    return_to_url = request.args.get('return_to', request.referrer) # Get return URL from param or referrer
+    # requested_scope_type = request.args.get('scope') # Moved up
+    return_to_url = request.args.get('return_to', request.referrer) 
 
     # --- Scope Determination Logic --- #
-    # Use only the necessary scopes based on user request
     if requested_scope_type == 'modify':
         if utils.should_log(): print("User requested modify scope for archiving capability")
         scopes_for_flow = [

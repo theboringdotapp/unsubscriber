@@ -3,261 +3,7 @@
 {% block title %}Scan Results - Gmail Unsubscriber{% endblock %}
 
 {% block head_extra %}
-<style>
-    /* Sender group styles with custom colors */
-    .sender-group {
-        border-left: 3px solid hsl(var(--sender-color-hsl, var(--brand))); /* Use HSL */
-        margin-bottom: 1rem;
-        border-radius: 0 var(--radius) var(--radius) 0; /* Apply border radius */
-        background-color: hsl(var(--card)); /* Use card background */
-        box-shadow: var(--shadow-sm); /* Add subtle shadow */
-        /* overflow: hidden; */ /* Removed this to allow tooltip overflow */
-        opacity: 0;
-        transform: translateY(10px);
-        animation: fadeInUp 0.5s ease forwards;
-    }
-    
-    /* Stagger the animation for sender groups */
-    .sender-group:nth-child(1) { animation-delay: 0.1s; }
-    .sender-group:nth-child(2) { animation-delay: 0.2s; }
-    .sender-group:nth-child(3) { animation-delay: 0.3s; }
-    .sender-group:nth-child(4) { animation-delay: 0.4s; }
-    .sender-group:nth-child(5) { animation-delay: 0.5s; }
-    
-    .sender-header {
-        padding: 0.75rem 1rem;
-        /* Use rgba with HSL variables for background */
-        background-color: hsla(var(--sender-color-hsl, var(--brand)), 0.1);
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        border-bottom: 1px solid hsl(var(--border)); /* Add border */
-    }
-    
-    .sender-name-container {
-        /* cursor: pointer; */ /* This was already here */
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        cursor: pointer; /* Keep this one */
-    }
-    
-    .collapse-button {
-        cursor: pointer;
-        padding: 0.25rem;
-        border-radius: var(--radius);
-        transition: background-color 0.2s;
-        color: hsl(var(--muted-foreground));
-    }
-    
-    .collapse-button:hover {
-        background-color: hsl(var(--muted));
-        color: hsl(var(--accent-foreground));
-    }
-    
-    .sender-emails {
-        overflow: hidden;
-        background-color: hsl(var(--card)); /* Ensure background */
-        padding: 0; /* Remove padding if emails have their own */
-    }
-    
-    .sender-emails.collapsed {
-        display: none;
-    }
-    
-    .sender-name {
-        transition: all 0.2s ease;
-        font-weight: 500;
-        color: hsl(var(--foreground)); /* Use foreground color */
-        cursor: pointer; /* Explicitly set cursor here */
-    }
-    
-    .sender-selected .sender-name {
-        text-decoration: line-through;
-        opacity: 0.7;
-    }
-    
-    /* Email row specific styles */
-    .email-row {
-        padding: 0.75rem 1rem;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        border-bottom: 1px solid hsl(var(--border));
-        transition: all 0.2s ease;
-        cursor: pointer; /* Added pointer cursor */
-        position: relative;
-        overflow: hidden;
-    }
-
-    .email-row:last-child {
-        border-bottom: none;
-    }
-
-    .email-row:hover {
-         background-color: hsl(var(--muted));
-    }
-    
-    .email-row:hover::after {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: linear-gradient(90deg, transparent, hsla(var(--brand), 0.05), transparent);
-        transform: translateX(-100%);
-        animation: shimmer 1s ease-out;
-    }
-    
-    @keyframes shimmer {
-        100% { transform: translateX(100%); }
-    }
-
-    .email-selected {
-        background-color: hsla(var(--brand), 0.1);
-    }
-
-    .email-selected .email-subject {
-         text-decoration: line-through;
-         opacity: 0.7;
-    }
-    
-    /* Content container with max-width - Inherited from base.html main */
-
-    /* Tooltip styles - Simplified */
-    .tooltip {
-        position: relative;
-        display: inline-flex;
-        margin-left: 0.5rem;
-    }
-    
-    .tooltip-icon {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 1.25rem;
-        height: 1.25rem;
-        border-radius: 50%;
-        background-color: hsl(var(--muted-foreground));
-        color: hsl(var(--background)); /* Contrast color */
-        font-size: 0.75rem;
-        font-weight: bold;
-        cursor: help;
-    }
-    
-    .tooltip-text {
-        visibility: hidden;
-        width: auto;
-        min-width: 200px;
-        background-color: hsl(var(--popover));
-        color: hsl(var(--popover-foreground));
-        border: 1px solid hsl(var(--border));
-        box-shadow: var(--shadow-md);
-        border-radius: var(--radius);
-        padding: 0.75rem;
-        position: absolute;
-        z-index: 10;
-        bottom: 125%; /* Position above */
-        left: 50%;
-        transform: translateX(-50%);
-        opacity: 0;
-        transition: opacity 0.3s;
-        font-size: 0.875rem;
-        font-weight: normal;
-        text-align: left;
-        pointer-events: none; /* Allow clicking through */
-    }
-    
-    .tooltip:hover .tooltip-text,
-    .tooltip:focus-within .tooltip-text { /* Show on focus within for accessibility */
-        visibility: visible;
-        opacity: 1;
-    }
-    
-    /* Arrow pointing down from tooltip */
-    .tooltip-text::after {
-        content: "";
-        position: absolute;
-        top: 100%;
-        left: 50%;
-        margin-left: -5px;
-        border-width: 5px;
-        border-style: solid;
-        border-color: hsl(var(--popover)) transparent transparent transparent;
-    }
-    .dark .tooltip-text::after {
-         border-color: hsl(var(--popover)) transparent transparent transparent;
-    }
-
-    /* Remove the border applied by the tooltip style itself */
-     .tooltip-text { border: none; } /* Remove this border, use shadow */
-
-
-    /* Table styles (if applicable, can be removed if only using divs) */
-    table { width: 100%; border-collapse: collapse; }
-    thead { border-bottom: 1px solid hsl(var(--border)); }
-    th { padding: 0.75rem 1rem; text-align: left; font-weight: 500; color: hsl(var(--muted-foreground)); }
-    td { padding: 0.75rem 1rem; border-bottom: 1px solid hsl(var(--border)); color: hsl(var(--foreground)); }
-    tbody tr:last-child td { border-bottom: none; }
-    tbody tr:hover { background-color: hsl(var(--muted)); }
-
-    /* Clickable Table Row Style */
-    .clickable-row {
-        cursor: pointer;
-    }
-    
-    /* Fixed action bar */
-    #fixed-action-bar {
-        padding: 1rem; /* Adjust padding */
-        /* Background and border inherited from base.html */
-        transform: translateY(20px);
-        opacity: 0;
-        transition: all 0.4s ease;
-    }
-    
-    #fixed-action-bar.visible {
-        transform: translateY(0);
-        opacity: 1;
-    }
-    
-    /* Ensure action bar buttons use new styles */
-    #fixed-action-bar .btn {
-        /* Style specific buttons if needed */
-    }
-    
-    /* Animation keyframes */
-    @keyframes fadeInUp {
-        from { opacity: 0; transform: translateY(10px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
-    
-    @keyframes scaleIn {
-        from { transform: scale(0.95); opacity: 0; }
-        to { transform: scale(1); opacity: 1; }
-    }
-    
-    /* Title animations */
-    h1, .subtitle {
-        opacity: 0;
-        animation: fadeInUp 0.5s ease forwards;
-    }
-    
-    h1 { animation-delay: 0.1s; }
-    .subtitle { animation-delay: 0.2s; }
-    
-    /* Button pulse effect */
-    @keyframes buttonPulse {
-        0% { box-shadow: 0 0 0 0 hsla(var(--brand), 0.5); }
-        70% { box-shadow: 0 0 0 10px hsla(var(--brand), 0); }
-        100% { box-shadow: 0 0 0 0 hsla(var(--brand), 0); }
-    }
-    
-    .btn-pulse {
-        animation: buttonPulse 2s infinite;
-    }
-
-</style>
+<!-- Style block removed -->
 {% endblock %}
 
 {% block content %}
@@ -1614,14 +1360,23 @@
     function showModal(content) {
         const modal = document.getElementById('result-modal');
         const modalContent = document.getElementById('modal-content');
+        if (!modal || !modalContent) return; // Add checks
         modalContent.innerHTML = content;
-        modal.classList.remove('modal-hidden');
+        modal.classList.remove('hidden'); // Keep this for initial display if needed?
+        modal.classList.add('visible'); // Add .visible class for opacity/visibility
     }
 
     function closeModal() {
         const modal = document.getElementById('result-modal');
-        modal.classList.add('modal-hidden');
-        document.getElementById('modal-content').innerHTML = ''; // Clear content
+        if (!modal) return; // Add check
+        modal.classList.remove('visible'); // Remove .visible class
+        // Allow animation to finish before hiding completely if needed
+        // Or rely purely on visibility: hidden from the CSS
+        // To ensure it's hidden for layout purposes after transition:
+        setTimeout(() => {
+            modal.classList.add('hidden'); // Re-add hidden if structure needs it
+            document.getElementById('modal-content').innerHTML = ''; // Clear content
+        }, 300); // Match transition duration
         updateActionBar(); // Update after closing modal
     }
     
@@ -1709,14 +1464,19 @@
     function showPermissionModal() {
         const modal = document.getElementById('permission-modal');
         if (modal) {
-            modal.classList.remove('modal-hidden');
+            modal.classList.remove('hidden');
+            modal.classList.add('visible'); // Add .visible class
         }
     }
     
     function closePermissionModal() {
         const modal = document.getElementById('permission-modal');
         if (modal) {
-            modal.classList.add('modal-hidden');
+            modal.classList.remove('visible'); // Remove .visible class
+            // Optional: Add timeout to re-add hidden if needed
+            setTimeout(() => {
+                 modal.classList.add('hidden');
+            }, 300); 
         }
     }
 

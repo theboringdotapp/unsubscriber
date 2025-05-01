@@ -27,19 +27,19 @@
         <div class="sender-group skeleton-sender">
             <div class="sender-header">
                 <div class="flex items-center gap-2">
-                    <div class="h-4 w-4 bg-secondary/80 rounded"></div>
-                    <div class="h-5 bg-secondary/80 rounded w-40"></div>
+                    <div class="h-4 w-4 bg-muted rounded"></div>
+                    <div class="h-5 bg-muted rounded w-40"></div>
                 </div>
-                <div class="h-5 w-5 bg-secondary/80 rounded"></div>
+                <div class="h-5 w-5 bg-muted rounded"></div>
             </div>
             <div class="sender-emails">
                 {% for j in range(3) %}
                 <div class="email-row skeleton-email">
                     <div class="flex items-center flex-1 min-w-0 mr-4">
-                        <div class="h-4 w-4 bg-secondary/80 rounded mr-3"></div>
-                        <div class="h-4 bg-secondary/80 rounded w-full max-w-md"></div>
+                        <div class="h-4 w-4 bg-muted rounded mr-3"></div>
+                        <div class="h-4 bg-muted rounded w-full max-w-md"></div>
                     </div>
-                    <div class="h-3 bg-secondary/80 rounded w-16"></div>
+                    <div class="h-3 bg-muted rounded w-16"></div>
                 </div>
                 {% endfor %}
             </div>
@@ -47,17 +47,8 @@
         {% endfor %}
     </div>
     
-    <!-- Scan Loader (initially hidden) -->
-    <div id="scan-loader" class="hidden max-w-4xl mx-auto mt-8 text-center">
-        <div class="inline-block">
-            <svg class="animate-spin h-8 w-8 text-brand" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-        </div>
-        <p class="text-muted-foreground mt-4">Scanning your inbox for subscriptions...</p>
-        <p class="text-sm text-muted-foreground mt-2">This may take a few moments</p>
-    </div>
+    <!-- Scan Loader div removed -->
+
 </div>
 
 {% endblock %}
@@ -67,64 +58,31 @@
 {% endblock %}
 
 {% block scripts %}
-<style>
-    /* Animation styles needed for this view */
-    @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-    
-    .fade-in-up { animation: fadeInUp 0.6s ease-out forwards; opacity: 0; }
-    .fade-in { animation: fadeIn 0.6s ease-out forwards; opacity: 0; }
-    
-    .animation-delay-100 { animation-delay: 0.1s; }
-    .animation-delay-200 { animation-delay: 0.2s; }
-    .animation-delay-300 { animation-delay: 0.3s; }
-
-    /* Skeleton UI styles - Copied from original index.html */
-    .skeleton-sender {
-        border-left: 3px solid hsl(var(--muted));
-        animation: skeletonPulse 1.5s infinite ease-in-out;
-    }
-    .skeleton-email { transition: all 0.3s ease; }
-    @keyframes skeletonPulse { 0% { opacity: 0.7; } 50% { opacity: 0.9; } 100% { opacity: 0.7; } }
-
-    /* Ensure necessary base styles are available via base.html or linked CSS */
-    .sender-group { border-radius: 0 var(--radius) var(--radius) 0; background-color: hsl(var(--card)); margin-bottom: 1rem; }
-    .sender-header { padding: 0.75rem 1rem; background-color: hsla(var(--muted), 0.5); display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid hsl(var(--border)); }
-    .sender-emails { background-color: hsl(var(--card)); }
-    .email-row { padding: 0.75rem 1rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid hsl(var(--border)); }
-    .email-row:last-child { border-bottom: none; }
-    .bg-secondary\/80 { background-color: hsla(var(--secondary), 0.8); } /* Example */
-    .bg-secondary\/60 { background-color: hsla(var(--secondary), 0.6); }
-
-</style>
-
+<!-- Style block removed, styles are now in css/styles.css -->
 <script>
     // Function to handle scan button click and show loader
     function startScan() {
         const skeletonList = document.getElementById('skeleton-list');
-        const scanLoader = document.getElementById('scan-loader');
+        // scanLoader element is removed
         const scanButton = document.getElementById('scan-button');
         
-        if (skeletonList && scanLoader && scanButton) {
-            // Disable the button and change text
-            scanButton.classList.add('opacity-50', 'cursor-not-allowed');
+        if (skeletonList && scanButton) { // Check only for skeletonList and scanButton
+            // Disable the button and change text ONLY
             scanButton.disabled = true;
-            // Add spinner to button (assuming base.html provides setLoading/hideLoading)
-            // If not, implement spinner addition here
-            const originalContent = scanButton.innerHTML;
-            scanButton.innerHTML = `<span class="spinner"></span> Scanning...`; 
-            scanButton.dataset.originalContent = originalContent; // Store original content
+            scanButton.classList.add('is-loading', 'opacity-60', 'cursor-not-allowed'); // Add loading state classes
+            scanButton.textContent = 'Scanning...'; // Change text
 
-            // Fade out the skeleton list
-            skeletonList.style.transition = 'opacity 0.5s ease';
-            skeletonList.style.opacity = '0';
-            
-            // Show the loader after fade out
-            setTimeout(() => {
-                skeletonList.style.display = 'none';
-                scanLoader.classList.remove('hidden');
-                scanLoader.classList.add('fade-in');
-            }, 500);
+            // Add loading animation class to skeleton
+            skeletonList.classList.add('skeleton-loading');
+
+            // Remove logic that hides skeletonList and shows scanLoader
+            // skeletonList.style.transition = 'opacity 0.5s ease';
+            // skeletonList.style.opacity = '0';
+            // setTimeout(() => {
+            //     skeletonList.style.display = 'none';
+            //     scanLoader.classList.remove('hidden');
+            //     scanLoader.classList.add('fade-in'); 
+            // }, 500);
             
             // Allow the form submission (link navigation) to proceed
             return true; 
@@ -133,14 +91,5 @@
         // Fallback if elements not found
         return true;
     }
-
-    // Add simple spinner keyframes if not globally available
-    const styleSheet = document.createElement("style")
-    styleSheet.type = "text/css"
-    styleSheet.innerText = `
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .spinner { border: 2px solid hsla(var(--brand), 0.2); width: 1em; height: 1em; border-radius: 50%; border-left-color: hsl(var(--brand)); animation: spin 1s ease infinite; display: inline-block; vertical-align: -0.125em; margin-right: 0.5em; }
-    `;
-    document.head.appendChild(styleSheet);
 </script>
 {% endblock %} 
