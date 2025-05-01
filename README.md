@@ -1,4 +1,4 @@
-# Gmail Unsubscriber
+# Unsubscriber
 
 A simple Flask web application to help users easily find and unsubscribe from mailing lists in their Gmail account.
 
