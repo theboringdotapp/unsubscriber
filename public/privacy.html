@@ -5,10 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Privacy Policy - Unsubscriber</title>
     <link rel="icon" href="/static/img/favicon.png" type="image/png">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Add CDN for Tailwind Typography Plugin -->
-    <script src="https://cdn.tailwindcss.com?plugins=typography"></script> 
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+    
+    <!-- Preconnect to critical domains -->
+    <link rel="preconnect" href="https://cdn.tailwindcss.com" crossorigin>
+    <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+    
     <!-- Add back inline theme script to prevent FOUC -->
     <script>
         if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
@@ -20,6 +23,20 @@
     
     <!-- Link to static CSS file -->
     <link rel="stylesheet" href="/static/css/styles.css">
+    
+    <!-- Tailwind CSS - Note: In production, this should be replaced with a proper build -->
+    <!-- See https://tailwindcss.com/docs/installation for proper production setup -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Add CDN for Tailwind Typography Plugin -->
+    <script src="https://cdn.tailwindcss.com?plugins=typography"></script> 
+    
+    <!-- Defer non-critical CSS -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
+    <!-- Fallback for browsers that don't support onload -->
+    <noscript>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+    </noscript>
     
     <!-- Umami Analytics -->
     <script defer src="https://cloud.umami.is/script.js" data-website-id="2ae0d0a0-78ae-4c42-9f01-be8104391628"></script>

@@ -17,7 +17,7 @@
     <meta name="twitter:card" content="summary_large_image">
     <meta property="twitter:domain" content="unsubscriber.theboring.app">
     <meta property="twitter:url" content="{{ request.url }}">
-    <meta name="twitter:title" content="{% block twitter_title %}Unsubscriber{% endblock %}">
+    <meta name="twitter:title" content="{% block twitter_title %}Email Unsubscriber{% endblock %}">
     <meta name="twitter:description" content="{% block twitter_description %}Remove all email subscriptions for free.{% endblock %}">
     <meta name="twitter:image" content="{% block twitter_image %}https://opengraph.b-cdn.net/production/images/c0cb977a-ed22-4027-9a59-355b397c8f50.jpg?token=16trzNHa7ceCBvlkAM2zf-awXBcg_jaVP32YaeQ2YOc&height=630&width=1200&expires=33282112639{% endblock %}">
     
@@ -29,13 +29,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="dns-prefetch" href="https://fonts.gstatic.com">
     
-    <!-- Defer non-critical CSS -->
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
-    <!-- Fallback for browsers that don't support onload -->
-    <noscript>
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
-    </noscript>
-    
+    <!-- Theme detection script - must be as early as possible -->
     <script>
         // On page load or when changing themes, best to add inline in `head` to avoid FOUC
         if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
@@ -45,12 +39,21 @@
         }
     </script>
     
-    <!-- Load critical CSS first -->
+    <!-- Critical CSS first -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
-    {% block head_extra %}{% endblock %}
     
-    <!-- Move Tailwind to end of body or load with defer -->
-    <script defer src="https://cdn.tailwindcss.com"></script>
+    <!-- Tailwind CSS - Note: In production, this should be replaced with a proper build -->
+    <!-- See https://tailwindcss.com/docs/installation for proper production setup -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Defer non-critical CSS -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
+    <!-- Fallback for browsers that don't support onload -->
+    <noscript>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+    </noscript>
+    
+    {% block head_extra %}{% endblock %}
     
     <!-- Umami Analytics - lightweight privacy-focused analytics -->
     <script defer src="https://cloud.umami.is/script.js" data-website-id="2ae0d0a0-78ae-4c42-9f01-be8104391628"></script>

@@ -29,19 +29,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="dns-prefetch" href="https://fonts.gstatic.com">
     
-    <!-- Load critical CSS first -->
-    <link rel="stylesheet" href="/static/css/styles.css">
-    
-    <!-- Defer non-critical CSS -->
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
-    <!-- Fallback for browsers that don't support onload -->
-    <noscript>
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
-    </noscript>
-    
-    <!-- Move Tailwind to end of body or load with defer -->
-    <script defer src="https://cdn.tailwindcss.com"></script>
-    
+    <!-- Theme detection script - must be as early as possible -->
     <script>
         // On page load or when changing themes, best to add inline in `head` to avoid FOUC
         if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
@@ -50,6 +38,20 @@
             document.documentElement.classList.remove('dark')
         }
     </script>
+    
+    <!-- Critical CSS first -->
+    <link rel="stylesheet" href="/static/css/styles.css">
+    
+    <!-- Tailwind CSS - Note: In production, this should be replaced with a proper build -->
+    <!-- See https://tailwindcss.com/docs/installation for proper production setup -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Defer non-critical CSS -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
+    <!-- Fallback for browsers that don't support onload -->
+    <noscript>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+    </noscript>
     
     <!-- Umami Analytics - deferred -->
     <script defer src="https://cloud.umami.is/script.js" data-website-id="2ae0d0a0-78ae-4c42-9f01-be8104391628"></script>
