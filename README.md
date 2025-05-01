@@ -132,7 +132,7 @@ Contributions are welcome! Please feel free to submit a Pull Request or open an 
 
 ## License
 
-[MIT License](LICENSE) (Assuming MIT - add a LICENSE file if needed)
+This project is licensed under the GNU General Public License v3.0. See the [LICENSE](LICENSE) file for details.
 
 ## Vibe Coding Analytics
 
