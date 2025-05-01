@@ -16,7 +16,19 @@ CREDENTIALS_FILE = 'credentials.json'
 MOCK_API = False
 
 # Scan limit
-MAX_SCAN_EMAILS = 50
+MAX_SCAN_EMAILS = 25
+EMAILS_PER_PAGE = 25 # Consistent page size for listing emails
+
+# Colors for sender groups in the UI
+SENDER_COLORS = [
+    '217 91% 60%', # Blue
+    '158 78% 42%', # Green
+    '350 89% 60%', # Pink
+    '39 95% 55%',  # Orange
+    '262 78% 60%', # Purple
+    '197 88% 55%', # Cyan
+    '22 90% 58%'   # Reddish-Orange
+]
 
 # Debug Logging Flag
 # DEBUG_LOGGING = os.getenv('FLASK_DEBUG_MODE', 'False').lower() == 'true' # REMOVED - Use utils.should_log() instead

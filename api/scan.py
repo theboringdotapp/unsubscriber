@@ -7,6 +7,7 @@ from email.mime.text import MIMEText
 from flask import Blueprint, redirect, url_for, request, session, flash, render_template, jsonify
 from googleapiclient.discovery import build # Needed?
 from datetime import datetime # Add datetime import
+from googleapiclient.http import BatchHttpRequest # Import BatchHttpRequest
 
 # Import utils and constants
 from . import utils
@@ -300,18 +301,16 @@ def format_email_date(internal_date_ms):
 
 @scan_bp.route('/emails', methods=['GET'])
 def scan_emails():
-    """Scans recent emails for unsubscribe links, supporting pagination."""
-    if utils.should_log(): print("--- SCAN ROUTE START ---")
+    """Scans recent emails for unsubscribe links, supporting pagination.
+    Uses batching to fetch email details efficiently."""
+    if utils.should_log(): print("--- SCAN ROUTE START (Batching Enabled) ---")
     page_token = request.args.get('token', None)
     if utils.should_log(): print(f"--- SCAN ROUTE: Received page token: {page_token} ---")
     
-    # Store the current page token if we're on a scan page
-    # This will be used when returning after permission upgrade
     if page_token:
         session['return_to_scan_token'] = page_token
-        if utils.should_log(): print(f"Storing current scan token: {page_token} for possible return after permission upgrade")
+        if utils.should_log(): print(f"Storing current scan token: {page_token} for possible return")
     
-    # Check if archive feature was just enabled
     archive_enabled = request.args.get('archive_enabled') == 'true'
     if utils.should_log(): print(f"--- SCAN ROUTE: Archive just enabled: {archive_enabled} ---")
 
@@ -319,37 +318,30 @@ def scan_emails():
     if not service:
         flash("Authentication required.", "warning")
         if utils.should_log(): print("Scan route: Not authenticated.")
-        return redirect(url_for('auth.login')) # Redirect to auth blueprint login
+        return redirect(url_for('auth.login'))
     
     authenticated = True 
     found_subscriptions = {} 
     next_page_token = None 
     
-    # Check if user has archive permissions
     if utils.should_log(): print("--- SCAN ROUTE: Checking archive permission... ---")
     has_archive_permission = utils.has_modify_scope()
     if utils.should_log(): print(f"--- SCAN ROUTE: Result of has_modify_scope check: {has_archive_permission} ---")
     
-    # Define colors here in Python
-    colors = [
-        '217 91% 60%', # Blue
-        '158 78% 42%', # Green
-        '350 89% 60%', # Pink
-        '39 95% 55%',  # Orange
-        '262 78% 60%', # Purple
-        '197 88% 55%', # Cyan
-        '22 90% 58%'   # Reddish-Orange
-    ]
+    colors = config.SENDER_COLORS # Get colors from config
 
     try:
-        if utils.should_log(): print("Fetching email page.")
+        if utils.should_log(): print("Fetching email list page.")
         max_scan_emails = config.MAX_SCAN_EMAILS # Get constant from config
-
+        
+        list_response = None
+        messages = []
+        
         if MOCK_API:
-             list_response = _get_mock_message_list(page_token=page_token)
+            list_response = _get_mock_message_list(page_token=page_token)
+            messages = list_response.get('messages', [])
+            next_page_token = list_response.get('nextPageToken')
         else:
-            # Combine specific header search with keyword fallback
-            # Add Spanish and Portuguese terms (with proper quoting for multi-word terms)
             spanish_portuguese_terms = ['"cancelar suscripción"', '"desuscribirse"', '"darse de baja"', 
                                        '"cancelar inscrição"', '"descadastrar"', '"desinscrever"']
             all_search_terms = config.UNSUBSCRIBE_SEARCH_TERMS + spanish_portuguese_terms
@@ -359,27 +351,77 @@ def scan_emails():
 
             list_response = service.users().messages().list(
                 userId='me',
-                maxResults=50,  # Increased from 20 to 50
+                maxResults=config.EMAILS_PER_PAGE, # Use config for page size
                 pageToken=page_token,
-                q=combined_query, # Use the combined query
+                q=combined_query, 
                 labelIds=['INBOX']
             ).execute()
+            
+            messages = list_response.get('messages', [])
+            next_page_token = list_response.get('nextPageToken')
 
-        messages = list_response.get('messages', [])
-        if not messages: print("No messages found on this page.")
+        if not messages: 
+            print("No messages found on this page.")
         else:
+            message_details = {} # To store results from batch
+            batch_errors = {}    # To store errors from batch
+
+            # Define the callback function for the batch request
+            def batch_callback(request_id, response, exception):
+                if exception:
+                    # Handle error for this specific request
+                    print(f"!!! BATCH ERROR fetching message {request_id}: {exception} !!!")
+                    batch_errors[request_id] = str(exception)
+                else:
+                    # Store successful response
+                    message_details[request_id] = response
+
+            # Define the correct Gmail batch URI
+            gmail_batch_uri = f"{service._baseUrl}/batch/gmail/v1"
+            if utils.should_log(): print(f"--- SCAN ROUTE: Using Gmail Batch URI: {gmail_batch_uri} ---")
+            
+            # Create a batch request with the specific URI and callback
+            batch = BatchHttpRequest(batch_uri=gmail_batch_uri, callback=batch_callback)
+            
+            # Add each message get request to the batch
             for message_stub in messages:
                 msg_id = message_stub['id']
-                try: # Add try/except around individual message processing
-                    if MOCK_API:
-                        full_message = _get_mock_message_details(msg_id)
-                        # Add mock date if needed for testing
-                        full_message['internalDate'] = str(int(datetime.now().timestamp() * 1000))
-                    else:
-                        full_message = service.users().messages().get(
-                            userId='me', id=msg_id, format='full'  # Change from 'metadata' to 'full'
-                        ).execute()
-                    
+                if MOCK_API:
+                    # If mocking, get details directly, bypass batch
+                    full_message = _get_mock_message_details(msg_id)
+                    full_message['internalDate'] = str(int(datetime.now().timestamp() * 1000)) # Mock date
+                    message_details[msg_id] = full_message
+                else:
+                    batch.add(
+                        service.users().messages().get(userId='me', id=msg_id, format='full'),
+                        # callback=batch_callback, # Callback is now set during BatchHttpRequest init
+                        request_id=msg_id # Use msg_id to map results easily
+                    )
+            
+            # Execute the batch request if not mocking API
+            if not MOCK_API and len(messages) > 0:
+                 if utils.should_log(): print(f"--- SCAN ROUTE: Executing batch request for {len(messages)} emails ---")
+                 try:
+                     batch.execute(http=service._http) # Pass authenticated http object
+                     if utils.should_log(): print(f"--- SCAN ROUTE: Batch execution finished. Errors: {len(batch_errors)}")
+                 except Exception as batch_exec_error:
+                      print(f"!!! FATAL BATCH EXECUTION ERROR: {batch_exec_error} !!!")
+                      flash("A critical error occurred while fetching email details.", "error")
+                      # Render template with error, potentially empty subscriptions
+                      return render_template('scan_results.html', 
+                                subscriptions={}, 
+                                error=f"Batch fetch error: {batch_exec_error}", 
+                                authenticated=authenticated, 
+                                current_page_token=page_token, 
+                                next_page_token=next_page_token, 
+                                colors=colors,
+                                has_archive_permission=has_archive_permission,
+                                config=config)
+
+            # Process the results collected by the batch callback (or directly if mocking)
+            if utils.should_log(): print(f"--- SCAN ROUTE: Processing {len(message_details)} fetched email details ---")
+            for msg_id, full_message in message_details.items():
+                try: 
                     link, link_type, body_link = find_unsubscribe_links(full_message)
                     
                     if link:
@@ -387,66 +429,50 @@ def scan_emails():
                         sender = next((h['value'] for h in headers if h['name'].lower() == 'from'), 'Unknown Sender')
                         subject = next((h['value'] for h in headers if h['name'].lower() == 'subject'), 'No Subject')
                         
-                        # Extract and format date
                         internal_date = full_message.get('internalDate', '0')
                         email_date_formatted = format_email_date(internal_date)
                         
-                        # Determine clean sender name (used as the primary key)
+                        # Determine clean sender name
                         if '<' in sender and '>' in sender:
                             clean_sender = sender[:sender.find('<')].strip().replace('"', '')
-                            # If name part is empty, use the email part as fallback
                             if not clean_sender:
-                                start = sender.find('<') + 1
-                                end = sender.find('>')
-                                if start < end:
-                                     clean_sender = sender[start:end]
-                                else:
-                                     clean_sender = sender # Fallback to raw if parsing fails badly
+                                start = sender.find('<') + 1; end = sender.find('>')
+                                clean_sender = sender[start:end] if start < end else sender
                         else: 
                             clean_sender = sender
                         
-                        # Structure the email data
                         email_data = {
-                            "id": msg_id,
-                            "subject": subject,
-                            "date": email_date_formatted,
-                            # We might not need link/type/full_sender per email anymore if handling unsubscribe per sender
-                            # Keep them for now if needed elsewhere, but check later
-                            "link": link, 
-                            "type": link_type, 
-                            "full_sender": sender,
-                            "body_link": body_link  # Add body link field
+                            "id": msg_id, "subject": subject, "date": email_date_formatted,
+                            "link": link, "type": link_type, "full_sender": sender,
+                            "body_link": body_link 
                         }
                         
-                        # Add to the dictionary using the new structure
                         if clean_sender not in found_subscriptions:
                             found_subscriptions[clean_sender] = {
                                 'emails': [email_data],
-                                # Store the first found unsubscribe link as the primary for the sender group
                                 'unsubscribe_link': link 
                             }
                         else:
                             found_subscriptions[clean_sender]['emails'].append(email_data)
-                            # Optionally update the primary link if a new one is found (e.g., prefer https)
-                            # For simplicity, we keep the first one found for this sender.
+                            # Keep the first link found for the sender group as the primary
+                            
                 except Exception as msg_error:
-                     print(f"!!! ERROR processing message {msg_id}: {msg_error} !!!")
-                     # Optionally skip this email or handle error appropriately
+                     # Log error processing a specific message after batch fetch
+                     print(f"!!! ERROR processing message {msg_id} (post-batch): {msg_error} !!!")
+                     # Continue processing other messages
 
-        next_page_token = list_response.get('nextPageToken')
-        if utils.should_log(): print(f"--- SCAN ROUTE: Next page token from API: {next_page_token} ---")
-        if utils.should_log(): print(f"Scan finished for this page. Found {len(found_subscriptions)} unique senders on this page.")
+        if utils.should_log(): print(f"--- SCAN ROUTE: Finished processing page. Found {len(found_subscriptions)} unique senders. Next token: {next_page_token} ---")
 
     except Exception as e:
         flash(f"An error occurred during email scan: {e}", "error")
-        print(f"!!! ERROR during scan loop: {e} !!!")
+        print(f"!!! ERROR during scan main try block: {e} !!!")
         # Pass colors, archive permission, and config here too
         return render_template('scan_results.html', 
-                          subscriptions=found_subscriptions, 
+                          subscriptions=found_subscriptions, # Might be partially populated
                           error=str(e), 
                           authenticated=authenticated, 
                           current_page_token=page_token, 
-                          next_page_token=next_page_token, 
+                          next_page_token=next_page_token, # Pass original next token if available
                           colors=colors,
                           has_archive_permission=has_archive_permission,
                           config=config)
