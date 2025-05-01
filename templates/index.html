@@ -14,7 +14,6 @@
     <div class="flex justify-center mb-10 fade-in-up animation-delay-200">
         <a href="{{ url_for('scan.scan_emails') }}"
            id="scan-button"
-           onclick="startScan()" 
            class="btn btn-brand btn-lg focus-ring shadow-lg shadow-brand/20 hover:shadow-xl hover:shadow-brand/30 hover:-translate-y-0.5 transition-all flex items-center">
             Scan Inbox Now
         </a>
@@ -58,38 +57,5 @@
 {% endblock %}
 
 {% block scripts %}
-<!-- Style block removed, styles are now in css/styles.css -->
-<script>
-    // Function to handle scan button click and show loader
-    function startScan() {
-        const skeletonList = document.getElementById('skeleton-list');
-        // scanLoader element is removed
-        const scanButton = document.getElementById('scan-button');
-        
-        if (skeletonList && scanButton) { // Check only for skeletonList and scanButton
-            // Disable the button and change text ONLY
-            scanButton.disabled = true;
-            scanButton.classList.add('is-loading', 'opacity-60', 'cursor-not-allowed'); // Add loading state classes
-            scanButton.textContent = 'Scanning...'; // Change text
-
-            // Add loading animation class to skeleton
-            skeletonList.classList.add('skeleton-loading');
-
-            // Remove logic that hides skeletonList and shows scanLoader
-            // skeletonList.style.transition = 'opacity 0.5s ease';
-            // skeletonList.style.opacity = '0';
-            // setTimeout(() => {
-            //     skeletonList.style.display = 'none';
-            //     scanLoader.classList.remove('hidden');
-            //     scanLoader.classList.add('fade-in'); 
-            // }, 500);
-            
-            // Allow the form submission (link navigation) to proceed
-            return true; 
-        }
-        
-        // Fallback if elements not found
-        return true;
-    }
-</script>
+<script src="{{ url_for('static', filename='js/scan.js') }}"></script>
 {% endblock %} 

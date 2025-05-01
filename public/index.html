@@ -228,37 +228,9 @@
         </div>
     </footer>
 
-    <!-- Global JS for theme toggling -->
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const themeToggle = document.getElementById('theme-toggle');
-            const sunIcon = document.querySelector('.sun-icon');
-            const moonIcon = document.querySelector('.moon-icon');
-            
-            function setTheme(theme) {
-                if (theme === 'dark') {
-                    document.documentElement.classList.add('dark');
-                    if(sunIcon) sunIcon.style.display = 'block';
-                    if(moonIcon) moonIcon.style.display = 'none';
-                    localStorage.theme = 'dark';
-                } else {
-                    document.documentElement.classList.remove('dark');
-                    if(sunIcon) sunIcon.style.display = 'none';
-                    if(moonIcon) moonIcon.style.display = 'block';
-                    localStorage.theme = 'light';
-                }
-            }
-
-            // Set initial icon state based on current theme
-            const currentTheme = localStorage.theme || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-            setTheme(currentTheme);
-            
-            themeToggle.addEventListener('click', function() {
-                const newTheme = document.documentElement.classList.contains('dark') ? 'light' : 'dark';
-                setTheme(newTheme);
-            });
-        });
-    </script>
+    <!-- Include theme.js for theme toggling -->
+    <script src="/static/js/theme.js"></script>
+    <script src="/static/js/common.js"></script>
 
 </body>
 </html> 

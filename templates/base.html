@@ -147,97 +147,11 @@
     </footer>
     {% endblock %}
 
-    <!-- Global JS -->
-    <script>
-        // Theme toggling functionality
-        document.addEventListener('DOMContentLoaded', function() {
-            const themeToggle = document.getElementById('theme-toggle');
-            const sunIcon = document.querySelector('.sun-icon');
-            const moonIcon = document.querySelector('.moon-icon');
-            
-            // Set initial icon state
-            if (document.documentElement.classList.contains('dark')) {
-                sunIcon.style.display = 'block';
-                moonIcon.style.display = 'none';
-            } else {
-                sunIcon.style.display = 'none';
-                moonIcon.style.display = 'block';
-            }
-            
-            themeToggle.addEventListener('click', function() {
-                document.documentElement.classList.toggle('dark');
-                
-                if (document.documentElement.classList.contains('dark')) {
-                    localStorage.theme = 'dark';
-                    sunIcon.style.display = 'block';
-                    moonIcon.style.display = 'none';
-                } else {
-                    localStorage.theme = 'light';
-                    sunIcon.style.display = 'none';
-                    moonIcon.style.display = 'block';
-                }
-            });
-            
-            // Storage is now cleared automatically during logout
-            
-            // Initialize auto-dismiss for flash messages
-            initFlashMessages();
-        });
+    <!-- Common JavaScript files -->
+    <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/common.js') }}"></script>
     
-        // Flash message handling
-        function initFlashMessages() {
-            const dismissTime = 6000; // 6 seconds
-            const alerts = document.querySelectorAll('.alert[data-auto-dismiss="true"]');
-            
-        /*     alerts.forEach(alert => {
-                setTimeout(() => {
-                    dismissAlert(alert);
-                }, dismissTime);
-            }); */
-        }
-        
-        function dismissAlert(alertElement) {
-            if (!alertElement) return;
-            
-            alertElement.classList.add('fade-out');
-            setTimeout(() => {
-                alertElement.remove();
-                
-                // Check if all alerts are gone and remove the container if empty
-                const container = document.getElementById('flash-messages');
-                if (container && container.children.length === 0) {
-                    container.remove();
-                }
-            }, 300);
-        }
-
-        // Loading state functionality
-        function setLoading(buttonId, loadingText = 'Processing...') {
-            const button = document.getElementById(buttonId);
-            if (button) {
-                button.disabled = true;
-                button.classList.add('is-loading'); // Add class for potential styling
-                // Store the original innerHTML for later restoration
-                button.dataset.originalContent = button.innerHTML;
-                
-                // Create the loading content (spinner class defined in CSS)
-                // Ensure spinner span doesn't have extra conflicting classes
-                button.innerHTML = `<span class="spinner"></span><span>${loadingText}</span>`; 
-            }
-        }
-        
-        function hideLoading(buttonId) {
-            const button = document.getElementById(buttonId);
-            if (button && button.classList.contains('is-loading')) {
-                // Restore the original content if available
-                if (button.dataset.originalContent) {
-                    button.innerHTML = button.dataset.originalContent;
-                }
-                button.disabled = false;
-                button.classList.remove('is-loading');
-            }
-        }
-    </script>
+    <!-- Page-specific JavaScript files -->
     {% block scripts %}{% endblock %}
 
     <!-- Fixed Action Bar Placeholder -->
