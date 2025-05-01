@@ -31,8 +31,20 @@ function showUnsubscribeProgressModal(senders) {
   const httpLinks = {};
   const mailtoLinks = {};
 
+  // Count total emails for accurate progress tracking
+  let totalEmails = 0;
+  const storedEmailDetails = getEmailDetailsFromStorage();
+
   // Generate a list of senders with progress indicators
   senders.forEach((sender, index) => {
+    // Count emails for this sender
+    const senderEmailIds = Object.values(storedEmailDetails)
+      .filter((detail) => detail.sender === sender)
+      .map((detail) => detail.id);
+
+    // If we found emails for this sender, add to total, otherwise assume at least 1
+    totalEmails += Math.max(1, senderEmailIds.length);
+
     // Store link info for each sender
     const senderId = sender
       .replace(/\s+/g, "-")
@@ -109,7 +121,7 @@ function showUnsubscribeProgressModal(senders) {
                 <div id="progress-bar" class="bg-brand h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
             </div>
             <div class="flex justify-between text-xs text-muted-foreground mt-1">
-                <span id="progress-text">0/${totalSenders} senders</span>
+                <span id="progress-text">0/${totalEmails.toString()} emails</span>
                 <span id="progress-percentage">0%</span>
             </div>
         </div>
@@ -125,6 +137,9 @@ function showUnsubscribeProgressModal(senders) {
 
   showModal(progressModalHtml);
 
+  // Store total emails to process for progress calculation
+  window.totalEmailsToProcess = totalEmails;
+
   // Start the first item as processing
   if (senders.length > 0) {
     updateSenderStatus(senders[0], "processing");
@@ -136,8 +151,13 @@ function showUnsubscribeProgressModal(senders) {
 
 // Update progress indicator
 function updateProgress(completedCount) {
-  const totalCount = window.totalSendersToProcess || 1;
-  const progressPercent = Math.floor((completedCount / totalCount) * 100);
+  // Use the emails count if available, otherwise fall back to sender count
+  const totalCount =
+    window.totalEmailsToProcess || window.totalSendersToProcess || 1;
+  const progressPercent = Math.min(
+    100,
+    Math.floor((completedCount / totalCount) * 100)
+  );
 
   // Update the progress bar
   const progressBar = document.getElementById("progress-bar");
@@ -145,10 +165,10 @@ function updateProgress(completedCount) {
   const progressPercentage = document.getElementById("progress-percentage");
 
   if (progressBar) progressBar.style.width = `${progressPercent}%`;
-  if (progressText)
-    progressText.innerText = `${Math.floor(
-      completedCount
-    )}/${totalCount} senders`;
+  if (progressText) {
+    const displayCount = Math.min(Math.floor(completedCount), totalCount);
+    progressText.innerText = `${displayCount}/${totalCount} emails`;
+  }
   if (progressPercentage) progressPercentage.innerText = `${progressPercent}%`;
 
   // Mock the progress of sender processing for visual feedback

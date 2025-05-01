@@ -256,7 +256,10 @@ async function performUnsubscribe() {
       }
 
       window.currentSenderIndex++;
-      updateProgress(window.currentSenderIndex);
+      // Update progress based on the number of emails processed so far
+      const processedEmailCount =
+        successfullyProcessedIds.length + manuallyRequiredIds.length;
+      updateProgress(processedEmailCount);
 
       return {
         success: automaticSuccess,
@@ -342,6 +345,11 @@ async function performUnsubscribe() {
         if (resultData.http_link && !lastHttpLink) {
           lastHttpLink = resultData.http_link;
         }
+
+        // Update progress with the new total processed count
+        const processedEmailCount =
+          successfullyProcessedIds.length + manuallyRequiredIds.length;
+        updateProgress(processedEmailCount);
       } else {
         console.error("Backend processing error:", resultData.error);
         errors.push(resultData.error || "Backend processing failed");
@@ -496,6 +504,11 @@ async function performUnsubscribe() {
     http_link: lastHttpLink,
     has_manual_actions: manualCount > 0,
   };
+
+  // Final progress update to ensure progress bar is complete
+  const finalProcessedCount =
+    successfullyProcessedIds.length + manuallyRequiredIds.length;
+  updateProgress(finalProcessedCount);
 
   // Show completion modal
   showModal(
