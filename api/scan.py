@@ -595,7 +595,9 @@ def unsubscribe_and_archive():
     
     for idx, (msg_id, link_type, link, sender) in enumerate(unsubscribe_actions):
         try:
-            if utils.should_log(): print(f"Found mailto link for {sender}: {link}")
+            # if utils.should_log(): print(f"Found mailto link for {sender}: {link}")
+            # Safer logging: Avoid logging sender email and full link
+            if utils.should_log(): print(f"Found mailto: unsubscribe link for sender ID associated with message {msg_id}") 
             
             # Parse mailto to get details to show to the user
             parsed_mailto = urlparse(link)

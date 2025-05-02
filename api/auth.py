@@ -214,7 +214,9 @@ def oauth2callback():
                  if utils.should_log(): print("--- DEBUG: oauth2callback: Local HTTP detected, and no https proxy header. Replacing http:// with https:// for Google check. ---")
                  authorization_response = authorization_response.replace('http://', 'https://', 1)
 
-        if utils.should_log(): print(f"--- DEBUG: oauth2callback: Fetching token with authorization_response: {authorization_response} ---")
+        # if utils.should_log(): print(f"--- DEBUG: oauth2callback: Fetching token with authorization_response: {authorization_response} ---")
+        # Safer logging: Avoid logging the full response URL which contains the sensitive 'code'
+        if utils.should_log(): print(f"--- DEBUG: oauth2callback: Fetching token using authorization response URL from Google... ---") 
 
         # Fetch the token using the authorization response URL
         flow.fetch_token(authorization_response=authorization_response)

@@ -92,10 +92,32 @@
             </ul>
 
             <h2>Data Storage and Security</h2>
+            <p>We are committed to protecting your data. Here's how we handle storage and security:</p>
             <ul>
-                <li><strong>No Long-Term Storage:</strong> We do <strong class="text-brand">not</strong> store your email content or headers on our servers after the scan process is complete. Information is processed in memory during the request and discarded afterward.</li>
-                <li><strong>Authentication Tokens:</strong> Google OAuth tokens are stored securely in your browser's session storage or server-side session (depending on implementation) and are used solely to communicate with the Gmail API on your behalf. These tokens expire and are cleared when you log out or the session ends.</li>
-                <li><strong>Local Processing:</strong> Where possible, scanning logic attempts to run within your browser to minimize data transfer.</li>
+                <li><strong>Transient Processing:</strong> We do <strong class="text-brand">not</strong> store your email content or headers persistently on our servers. Information required for identifying unsubscribe links (email headers) is processed transiently in memory during the scan request within our secure cloud function environment and is discarded immediately after the scan results are provided to you.</li>
+                <li><strong>Authentication Tokens:</strong> Google OAuth 2.0 tokens (access and refresh tokens) grant the application access to your Gmail data according to the scopes you approve. These tokens are sensitive and are stored securely:
+                    <ul>
+                        <li>Tokens are stored encrypted within your server-side session, managed by our hosting provider's secure infrastructure (e.g., Vercel).</li>
+                        <li>Access to these tokens is strictly limited to the necessary application functions for communicating with the Gmail API on your behalf.</li>
+                        <li>All communication between your browser, our servers, and Google's servers uses HTTPS encryption to protect data in transit.</li>
+                    </ul>
+                </li>
+                <li><strong>Minimal Scope Usage:</strong> We request the minimum necessary permissions (scopes) from Google to perform the app's functions (reading headers, optionally modifying labels for archiving). We do not request broader access than required.</li>
+                <li><strong>Compliance:</strong> Our data handling practices adhere to the <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" class="text-brand hover:underline">Google API Services User Data Policy</a>, including the Limited Use requirements.</li>
+            </ul>
+
+            <h2>Data Retention and Deletion</h2>
+            <p>We believe in minimizing data retention. Here's our policy:</p>
+            <ul>
+                <li><strong>Email Data:</strong> As stated above, email header data is processed transiently and <strong class="text-brand">never stored</strong> after the scan request is complete.</li>
+                <li><strong>Authentication Tokens:</strong> OAuth tokens stored in your session are retained only for the duration of your active session. They are automatically deleted when:
+                    <ul>
+                        <li>You explicitly log out of the Service.</li>
+                        <li>Your session expires due to inactivity (as managed by the hosting platform).</li>
+                    </ul>
+                </li>
+                <li><strong>Account Deletion / Revocation:</strong> You have full control over the application's access to your Google Account. You can revoke Unsubscriber's permissions at any time via your Google Account settings (<a href="https://myaccount.google.com/permissions" target="_blank" class="text-brand hover:underline">https://myaccount.google.com/permissions</a>). Revoking permissions immediately invalidates any stored tokens, effectively deleting the application's ability to access your data.</li>
+                <li><strong>Inactive Accounts:</strong> While tokens expire with sessions, we do not currently implement a separate process for deleting inactive user *accounts* themselves, as we do not store user account information persistently outside of the session tokens. If you revoke access via Google, the connection is severed.</li>
             </ul>
 
             <h2>Third-Party Services</h2>
