@@ -1,0 +1,56 @@
+name: Update README Stats
+
+on:
+  push:
+    branches:
+      - main # Or your default branch name
+
+jobs:
+  update-stats:
+    runs-on: ubuntu-latest
+    # Prevent running on forks unless specifically intended
+    if: github.repository == 'theboringdotapp/unsubscriber' # IMPORTANT: Replace with your actual repo path
+
+    permissions:
+      # Need write access to push the updated README
+      contents: write
+
+    steps:
+      - name: Checkout Full History
+        uses: actions/checkout@v4
+        with:
+          # Need full history for the time estimator script
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x" # Use a recent Python 3 version
+
+      - name: Generate Stats
+        id: generate_stats
+        run: |
+          # Run the script and capture its output, ensure errors cause failure
+          stats=$(python git_time_estimator.py)
+          # Make the output safe for multiline environment variable
+          stats="${stats//'/'\''}" # Escape single quotes
+          echo "stats_content<<EOF" >> $GITHUB_OUTPUT
+          echo "$stats" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Update README
+        id: update_readme
+        run: |
+          chmod +x .github/scripts/update_readme.py
+          python .github/scripts/update_readme.py README.md
+        env:
+          STATS_CONTENT: ${{ steps.generate_stats.outputs.stats_content }}
+
+      - name: Commit and Push Changes
+        if: steps.update_readme.outputs.changed == 'true'
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add README.md
+          git commit -m "chore: Update README stats [skip ci]"
+          git push

@@ -153,10 +153,8 @@ This project was developed 100% using Vibe Coding (AI-assisted development) with
 - **Total: $55.23**
 
 ### Time Metrics
-- Total time spent: 11h 29m (690.0 minutes)
-- Number of sessions: 22
-- Total commits: 75
-- Average session length: 31.4 minutes
-- Average time per commit: 9.2 minutes
+<!-- START_GIT_TIME_STATS -->
+*(Stats will be automatically inserted here by a GitHub Action)*
+<!-- END_GIT_TIME_STATS -->
 
 *Time is calculated based on the commit history, so not 100% accurate.
