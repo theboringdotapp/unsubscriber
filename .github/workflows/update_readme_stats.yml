@@ -30,13 +30,14 @@ jobs:
       - name: Generate Stats
         id: generate_stats
         run: |
-          # Run the script and capture its output, ensure errors cause failure
-          stats=$(python git_time_estimator.py)
-          # Make the output safe for multiline environment variable
-          stats="${stats//'/'\''}" # Escape single quotes
+          # Run the script and redirect output to a temporary file
+          python git_time_estimator.py > stats_output.txt
+          # Write the content of the temp file to GITHUB_OUTPUT using heredoc
           echo "stats_content<<EOF" >> $GITHUB_OUTPUT
-          echo "$stats" >> $GITHUB_OUTPUT
+          cat stats_output.txt >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
+          # Clean up the temporary file
+          rm stats_output.txt
 
       - name: Update README
         id: update_readme
