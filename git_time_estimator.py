@@ -157,11 +157,10 @@ def main():
             
             # Add author breakdown if multiple authors
             if len(author_times) > 1:
-                stats_lines.append(f"")
-                stats_lines.append(f"  **Time by Author:**")
+                stats_lines.append(f"\n#### Time by Author:")
                 for author, mins in sorted(author_times.items(), key=lambda x: x[1], reverse=True):
                     percentage = (mins / total_mins) * 100 if total_mins else 0
-                    stats_lines.append(f"    - {author}: {format_time(mins)} ({percentage:.1f}%)")
+                    stats_lines.append(f"- {author}: {format_time(mins)} ({percentage:.1f}%)")
             
             stats_output = "\n".join(line for line in stats_lines if line is not None)
         
