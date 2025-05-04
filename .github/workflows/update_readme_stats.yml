@@ -32,10 +32,10 @@ jobs:
         run: |
           # Run the script and redirect output to a temporary file
           python git_time_estimator.py > stats_output.txt
-          # Write the content of the temp file to GITHUB_OUTPUT using heredoc
-          echo "stats_content<<EOF" >> $GITHUB_OUTPUT
-          cat stats_output.txt >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          # Base64 encode the file content and write to GITHUB_OUTPUT
+          # Use -w 0 for base64 to prevent line wrapping
+          encoded_stats=$(base64 -w 0 stats_output.txt)
+          echo "stats_content_b64=$encoded_stats" >> $GITHUB_OUTPUT
           # Clean up the temporary file
           rm stats_output.txt
 
@@ -43,9 +43,14 @@ jobs:
         id: update_readme
         run: |
           chmod +x .github/scripts/update_readme.py
+          # Decode the Base64 stats content before passing to the script
+          decoded_stats=$(echo "${STATS_CONTENT_B64}" | base64 -d)
+          # Pass decoded content via environment variable
+          export STATS_CONTENT="$decoded_stats"
           python .github/scripts/update_readme.py README.md
         env:
-          STATS_CONTENT: ${{ steps.generate_stats.outputs.stats_content }}
+          # Pass the Base64 encoded content from the previous step
+          STATS_CONTENT_B64: ${{ steps.generate_stats.outputs.stats_content_b64 }}
 
       - name: Commit and Push Changes
         if: steps.update_readme.outputs.changed == 'true'
