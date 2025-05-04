@@ -542,7 +542,7 @@ function removeProcessedEmails() {
         // Use the same regex pattern as in other parts of the code
         const senderId = sender
           .replace(/\s+/g, "-")
-          .replace(/[<>]/g, "")
+          .replace(/[<>'"()]/g, "")
           .replace(/@/g, "-")
           .replace(/\./g, "-");
 
