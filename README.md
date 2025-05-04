@@ -154,7 +154,17 @@ This project was developed 100% using Vibe Coding (AI-assisted development) with
 
 ### Time Metrics
 <!-- START_GIT_TIME_STATS -->
-*(Stats will be automatically inserted here by a GitHub Action)*
+
+- Total time spent: 13h 30m (810.0 minutes)
+- Number of sessions: 27
+- Total commits: 92
+- Average session length: 30m (30.0 minutes)
+- Average time per commit: 8m (8.8 minutes)
+
+  **Time by Author:**
+    - Arthur Floriani: 13h 7m (97.3%)
+    - theboring.app: 22m (2.7%)
+
 <!-- END_GIT_TIME_STATS -->
 
 *Time is calculated based on the commit history, so not 100% accurate.
