@@ -92,14 +92,15 @@
                             <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
                         </svg>
                     </button>
-                    {% if authenticated %}
-                        <a href="{{ url_for('auth.logout') }}" class="btn btn-outline btn-sm focus-ring">
-                            Logout
-                        </a>
+                    {% if user %}
+                        <a href="{{ url_for('auth.logout') }}" class="btn btn-outline btn-sm focus-ring">Logout</a>
                     {% else %}
-                         <a href="{{ url_for('auth.login') }}" class="btn btn-brand btn-sm focus-ring">
-                             Scan Now
-                         </a>
+                         <button type="button" 
+                                 id="header-scan-button" 
+                                 onclick="openDisclosureModal()" 
+                                 class="btn btn-brand btn-sm focus-ring">
+                              Scan Inbox
+                          </button>
                     {% endif %}
                 </div>
             </div>

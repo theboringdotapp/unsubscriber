@@ -60,9 +60,13 @@
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" class="moon-icon" style="display:none;"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
                     </button>
                     <!-- Apply btn classes -->
-                     <a href="/auth/login" class="btn btn-brand btn-sm focus-ring" id="auth-button">
-                         Login with Google
-                     </a>
+                    <!-- Header Scan Button -->
+                    <button type="button" 
+                            id="header-scan-button-privacy" 
+                            onclick="openDisclosureModal()" 
+                            class="btn btn-brand btn-sm focus-ring">
+                         Scan Inbox
+                     </button>
                 </div>
             </div>
         </div>
@@ -207,5 +211,49 @@
         });
     </script>
 
+    <!-- Add common.js include -->
+    <script src="/static/js/common.js"></script>
+
+    <!-- Google Verification Disclosure Modal -->
+    <div id="casa-disclosure-modal" class="modal-overlay modal-hidden">
+        <div class="card max-w-lg w-full shadow-lg bg-background p-6 m-4"> <!-- Added margin for small screens -->
+            <div class="flex justify-between items-start mb-4">
+                <div class="flex items-center gap-3">
+                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="text-warning">
+                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                        <line x1="12" y1="9" x2="12" y2="13"></line>
+                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                    </svg>
+                    <h3 class="text-xl font-semibold text-foreground">Important Information</h3>
+                </div>
+                 <button type="button" onclick="closeDisclosureModal()" class="btn btn-ghost btn-sm p-1 focus-ring -mr-2 -mt-2"> <!-- Adjusted positioning -->
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+            
+            <div class="text-foreground text-sm space-y-3 mb-6">
+                <p>This application uses the Gmail API to scan your inbox for subscription emails. Because we offer this tool for free and it's open-source, we haven't completed Google's costly verification process (CASA certification).</p>
+                <p>Therefore, when you proceed to log in with Google, you will likely see a screen warning that <strong class="text-warning-foreground">"Google hasn't verified this app"</strong>. This is expected.</p>
+                <p>You can review the permissions requested (read-only access by default) on the consent screen. We value your privacy, and the code is fully <a href="https://github.com/theboringdotapp/unsubscriber" target="_blank" class="text-brand hover:underline font-medium">available on GitHub</a> for inspection.</p>
+                <p>If you are comfortable proceeding despite the warning, click "Login with Google" below. Alternatively, you can run the project yourself from the source code.</p>
+            </div>
+            
+            <div class="flex flex-col sm:flex-row gap-3 sm:justify-end">
+                 <a href="https://github.com/theboringdotapp/unsubscriber" target="_blank" class="btn btn-secondary btn-sm focus-ring order-1 sm:order-0">
+                    View Code
+                </a>
+                <!-- Button to proceed with Google Login -->
+                <a href="/auth/login" class="btn btn-brand btn-sm focus-ring order-0 sm:order-1 flex items-center justify-center"> <!-- Added flex/justify for icon alignment -->
+                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" class="mr-2"> <!-- Slightly smaller icon -->
+                        <path fill="#ffffff" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                        <path fill="#ffffff" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                        <path fill="#ffffff" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                        <path fill="#ffffff" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                    </svg>
+                    Login with Google
+                </a>
+            </div>
+        </div>
+    </div>
 </body>
 </html> 
