@@ -35,8 +35,11 @@ def get_git_log():
                 'hash': commit_hash,
                 'author': author_name
             })
-    
-    return sorted(commits, key=lambda x: x['timestamp'])
+
+    # Filter out bot commits
+    filtered_commits = [c for c in commits if c['author'] != 'github-actions[bot]']
+
+    return sorted(filtered_commits, key=lambda x: x['timestamp'])
 
 def group_commits_into_sessions(commits, session_threshold_mins=30):
     """Group commits into coding sessions based on time proximity."""
@@ -172,8 +175,9 @@ def main():
                 print(f"Error writing to output file {args.output_file}: {e}", file=sys.stderr)
                 sys.exit(1)
         else:
-            # Print directly to stdout if no output file specified
-            print(stats_output)
+            # Print directly to stdout without adding an extra newline
+            # print(stats_output)
+            sys.stdout.write(stats_output)
 
     except Exception as e:
         print(f"Error generating stats: {e}", file=sys.stderr)
