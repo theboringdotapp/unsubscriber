@@ -4,8 +4,8 @@
 
 // --- Initialization ---
 document.addEventListener("DOMContentLoaded", function () {
-  loadSelectionFromStorage(); // Check boxes based on storage
-  updateActionBar(); // Initial action bar update based on storage
+  // loadSelectionFromStorage(); // Moved to initializeUIState
+  // updateActionBar(); // Moved to initializeUIState
   markProcessedSenders(); // Mark senders processed in this session
 
   // Add visible class to fixed action bar after a short delay
@@ -422,6 +422,15 @@ function selectAllOnPage() {
 }
 
 // --- Global functions exposed to window ---
+
+// New function to initialize UI state after data is ready
+function initializeUIState() {
+  console.log("Initializing UI state...");
+  loadSelectionFromStorage(); // Check boxes based on storage
+  updateActionBar(); // Initial action bar update based on storage
+}
+
+window.initializeUIState = initializeUIState; // Expose globally
 window.toggleCollapse = toggleCollapse;
 window.toggleSenderSelection = toggleSenderSelection;
 window.selectAllSenderEmails = selectAllSenderEmails;

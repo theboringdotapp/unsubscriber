@@ -170,43 +170,9 @@ def find_unsubscribe_links(message_data):
     except Exception as e:
         print(f"Error parsing message for unsubscribe link: {e}")
 
-    # Choose the primary link based on improved logic
-    primary_link = None
-    link_type = None
-    
-    # If header link is a webhook URL and we have a good body link, prefer the body link
-    header_link = unsubscribe_info["header_link"]
-    body_link = unsubscribe_info["body_link"]
-    body_score = unsubscribe_info["body_link_score"]
-    
-    # Check if header link seems to be a webhook or tracking URL
-    header_is_webhook = False
-    if header_link:
-        header_lower = header_link.lower()
-        if ('webhook' in header_lower or 'callback' in header_lower or 
-            'track' in header_lower or 'api.' in header_lower or 
-            ('click' in header_lower and 'unsubscribe' not in header_lower)):
-            header_is_webhook = True
-    
-    # Decision logic
-    if body_link and (body_score >= 7 or (header_is_webhook and body_score > 0)):
-        # Use body link if it's high quality or if header is webhook and body is decent
-        primary_link = body_link
-        link_type = "body_link"
-    elif header_link:
-        # Fall back to header link
-        primary_link = header_link
-        link_type = "header_http"
-    elif body_link:
-        # Use body link even if lower quality when no header link exists
-        primary_link = body_link
-        link_type = "body_link"
-    elif unsubscribe_info["mailto_link"]:
-        # Last resort is mailto
-        primary_link = unsubscribe_info["mailto_link"]
-        link_type = "header_mailto"
-    
-    return primary_link, link_type, body_link
+    # Remove the primary link selection logic
+    # Return the dictionary containing all found link types
+    return unsubscribe_info
 
 def parse_unsubscribe_header_value(value, unsubscribe_info):
     """Helper function to parse unsubscribe header values."""
@@ -422,9 +388,16 @@ def scan_emails():
             if utils.should_log(): print(f"--- SCAN ROUTE: Processing {len(message_details)} fetched email details ---")
             for msg_id, full_message in message_details.items():
                 try: 
-                    link, link_type, body_link = find_unsubscribe_links(full_message)
-                    
-                    if link:
+                    # Get the dictionary of links
+                    unsubscribe_info = find_unsubscribe_links(full_message)
+                    header_link = unsubscribe_info.get("header_link")
+                    mailto_link = unsubscribe_info.get("mailto_link")
+                    body_link = unsubscribe_info.get("body_link")
+
+                    # Determine the primary link for display/initial action based on priority: header > mailto > body
+                    primary_link = header_link or mailto_link or body_link
+
+                    if primary_link: # Proceed if at least one type of link was found
                         headers = full_message.get('payload', {}).get('headers', [])
                         sender = next((h['value'] for h in headers if h['name'].lower() == 'from'), 'Unknown Sender')
                         subject = next((h['value'] for h in headers if h['name'].lower() == 'subject'), 'No Subject')
@@ -442,19 +415,30 @@ def scan_emails():
                             clean_sender = sender
                         
                         email_data = {
-                            "id": msg_id, "subject": subject, "date": email_date_formatted,
-                            "link": link, "type": link_type, "full_sender": sender,
-                            "body_link": body_link 
+                            "id": msg_id, 
+                            "subject": subject, 
+                            "date": email_date_formatted,
+                            "full_sender": sender,
+                            # Store all potential links
+                            "header_link": header_link, 
+                            "mailto_link": mailto_link, 
+                            "body_link": body_link,
+                            # Store the primary link determined for this specific email
+                            "unsubscribe_link": primary_link 
                         }
                         
                         if clean_sender not in found_subscriptions:
                             found_subscriptions[clean_sender] = {
                                 'emails': [email_data],
-                                'unsubscribe_link': link 
+                                # Keep the first primary link found for the sender group 
+                                # for display purposes in the header? Or maybe remove this top-level one.
+                                # Let's remove it for now to avoid confusion. The link per email is more accurate.
+                                # 'unsubscribe_link': primary_link 
                             }
                         else:
                             found_subscriptions[clean_sender]['emails'].append(email_data)
-                            # Keep the first link found for the sender group as the primary
+                            # Update sender group's primary link if a header link is found later? 
+                            # No, keep it simple. Each email has its own links.
                             
                 except Exception as msg_error:
                      # Log error processing a specific message after batch fetch
@@ -493,161 +477,108 @@ def scan_emails():
 @scan_bp.route('/unsubscribe', methods=['POST'])
 def unsubscribe_and_archive():
     """Handles the unsubscribe action from the form. 
-    Optimized to focus on mailto links only, as HTTP links are handled client-side."""
+    Identifies mailto links for manual user action and prepares HTTP links for client-side processing."""
     service = utils.get_gmail_service()
     if not service:
         return jsonify({"success": False, "error": "Authentication required. Please refresh and log in again."}), 401
 
     # Get data from form POST
     email_ids = request.form.getlist('email_ids')
+    # Get links associated with these IDs (sent from client)
+    header_links = request.form.getlist('header_links') 
+    body_links = request.form.getlist('body_links')
+    mailto_links = request.form.getlist('mailto_links')
+    
     should_archive = request.form.get('archive') == 'true'
     
-    if not email_ids:
-        return jsonify({"success": False, "error": "Missing email IDs."}), 400
+    if not email_ids or len(email_ids) != len(header_links) or len(email_ids) != len(body_links) or len(email_ids) != len(mailto_links):
+        return jsonify({"success": False, "error": "Missing or mismatched email data."}), 400
         
     if utils.should_log(): print(f"--- UNSUBSCRIBE ACTION for {len(email_ids)} emails, Archive: {should_archive} ---")
     
-    # We'll process unsubscribe actions per sender to avoid duplicates
-    processed_senders = set()
-    unsubscribe_actions = [] # List of tuples: (email_id, link_type, link, sender)
-    emails_to_archive = set(email_ids) if should_archive else set()
+    emails_data = []
+    for i in range(len(email_ids)):
+        emails_data.append({
+            "id": email_ids[i],
+            "header_link": header_links[i] if header_links[i] != 'null' else None,
+            "body_link": body_links[i] if body_links[i] != 'null' else None,
+            "mailto_link": mailto_links[i] if mailto_links[i] != 'null' else None,
+        })
+
+    mailto_actions = []
+    # We don't need sender grouping here anymore, as the client sends exact links per ID
     
-    # Map to store email IDs by sender
-    sender_email_map = {}
-    
-    # Step 1: First pass to organize emails by sender
-    if utils.should_log(): print(f"Organizing {len(email_ids)} emails by sender")
-    
-    # Process in batches to reduce API calls - batch size of 10
-    batch_size = 10
-    for i in range(0, len(email_ids), batch_size):
-        batch_ids = email_ids[i:i+batch_size]
+    if utils.should_log(): print(f"Processing {len(emails_data)} emails for unsubscribe links")
+
+    for email_data in emails_data:
+        msg_id = email_data["id"]
+        mailto_link = email_data["mailto_link"]
         
-        for msg_id in batch_ids:
-            try:
-                # Get minimal metadata - just the From header
-                full_message = service.users().messages().get(
-                    userId='me', 
-                    id=msg_id, 
-                    format='metadata', 
-                    metadataHeaders=['From']
-                ).execute()
+        # We only need to process mailto links on the backend for now
+        if mailto_link:
+             try:
+                # Safer logging
+                if utils.should_log(): print(f"Found mailto: unsubscribe link for message {msg_id}") 
                 
-                headers = full_message.get('payload', {}).get('headers', [])
-                sender_raw = next((h['value'] for h in headers if h['name'].lower() == 'from'), 'Unknown Sender')
+                # Parse mailto to get details to show to the user
+                parsed_mailto = urlparse(mailto_link)
+                to_address = parsed_mailto.path
+                params = parse_qs(parsed_mailto.query)
+                subject = params.get('subject', ['Unsubscribe'])[0]
+                body = params.get('body', ['Please unsubscribe me.'])[0]
                 
-                # Clean up sender name for grouping and display
-                if '<' in sender_raw and '>' in sender_raw:
-                    display_sender = sender_raw[:sender_raw.find('<')].strip().replace('"', '')
-                    if not display_sender:
-                        # Use email part if name is empty
-                        email_part = sender_raw[sender_raw.find('<')+1:sender_raw.find('>')]
-                        display_sender = email_part if email_part else sender_raw
-                else:
-                    display_sender = sender_raw
+                if not to_address:
+                    print(f"Warning: Mailto link missing recipient for email {msg_id}")
+                    continue
+                    
+                # Add to the list of links to show in the UI
+                mailto_actions.append({
+                    'message_id': msg_id,
+                    'email': to_address,
+                    'subject': subject,
+                    'body': body,
+                    'link': mailto_link # Keep original link
+                    # Sender info is not readily available here without another API call, UI might need adjustment
+                })
                 
-                # Store this email ID under its sender
-                if display_sender not in sender_email_map:
-                    sender_email_map[display_sender] = []
-                
-                sender_email_map[display_sender].append(msg_id)
-                
-            except Exception as e:
-                print(f"Error getting sender for email {msg_id}: {e}")
-    
-    # Step 2: Find unsubscribe links from the first email for each sender
-    if utils.should_log(): print(f"Found {len(sender_email_map)} unique senders")
-    
-    for sender, sender_email_ids in sender_email_map.items():
-        if not sender_email_ids:
-            continue
-            
-        # Use the first email from this sender to check for unsubscribe link
-        first_email_id = sender_email_ids[0]
-        
-        try:
-            # Get unsubscribe headers for this email
-            full_message = service.users().messages().get(
-                userId='me', 
-                id=first_email_id, 
-                format='metadata', 
-                metadataHeaders=[
-                    'List-Unsubscribe', 'X-List-Unsubscribe', 'List-Unsubscribe-Post'
-                ]
-            ).execute()
-            
-            link, link_type, body_link = find_unsubscribe_links(full_message)
-            
-            # We're only interested in mailto links here, as HTTP links are handled client-side
-            if link and link_type == 'header_mailto':
-                unsubscribe_actions.append((first_email_id, link_type, link, sender))
-                
-        except Exception as e:
-            print(f"Error finding unsubscribe link for sender {sender} (email {first_email_id}): {e}")
-    
-    # We no longer process mailto links automatically
-    # Instead we'll save them for the user to handle manually
-    if utils.should_log(): print(f"Found {len(unsubscribe_actions)} mailto unsubscribe links")
-    
-    # We'll collect these links to display to the user in the UI
-    # No automatic processing is done with the readonly scope
-    mailto_links = []
-    
-    for idx, (msg_id, link_type, link, sender) in enumerate(unsubscribe_actions):
-        try:
-            # if utils.should_log(): print(f"Found mailto link for {sender}: {link}")
-            # Safer logging: Avoid logging sender email and full link
-            if utils.should_log(): print(f"Found mailto: unsubscribe link for sender ID associated with message {msg_id}") 
-            
-            # Parse mailto to get details to show to the user
-            parsed_mailto = urlparse(link)
-            to_address = parsed_mailto.path
-            params = parse_qs(parsed_mailto.query)
-            subject = params.get('subject', ['Unsubscribe'])[0]
-            body = params.get('body', ['Please unsubscribe me.'])[0]
-            
-            if not to_address:
-                print(f"Warning: Mailto link missing recipient for {sender}")
-                continue
-                
-            # Add to the list of links to show in the UI
-            mailto_links.append({
-                'sender': sender,
-                'message_id': msg_id,
-                'email': to_address,
-                'subject': subject,
-                'body': body,
-                'link': link
-            })
-            
-        except Exception as e:
-            error_detail = f"Failed to parse mailto link for {sender}: {e}"
-            print(f"ERROR: {error_detail}")
-    
+             except Exception as e:
+                 error_detail = f"Failed to parse mailto link for email {msg_id}: {e}"
+                 print(f"ERROR: {error_detail}")
+
     # We don't have success/fail counts or processed IDs anymore
-    # since we're not automatically sending emails
-    successfully_processed_ids = []
+    # since we're not automatically sending emails via mailto
     
-    # Step 4: Archive emails if requested (now handled client-side in a separate request)
-    # Batch archive is now done in a separate endpoint call to optimize cloud function usage
+    if utils.should_log(): print(f"Found {len(mailto_actions)} mailto links for manual handling")
     
-    # Construct response for UI display (no processing with readonly scope)
+    # Construct response for UI display
+    # The message should reflect that HTTP links are intended for client-side processing
     
-    if utils.should_log(): print(f"Found {len(mailto_links)} mailto links for manual handling")
+    http_link_count = sum(1 for e in emails_data if e["header_link"] or e["body_link"])
     
-    final_message = f"Found {len(mailto_links)} email{'s' if len(mailto_links) != 1 else ''} with mailto: unsubscribe links."
-    
+    message_parts = []
+    if http_link_count > 0:
+        message_parts.append(f"{http_link_count} HTTP unsubscribe request{'s' if http_link_count != 1 else ''} will be attempted.")
+    if len(mailto_actions) > 0:
+         message_parts.append(f"Found {len(mailto_actions)} mailto link{'s' if len(mailto_actions) != 1 else ''} requiring manual action.")
+         
+    if not message_parts:
+        final_message = "No unsubscribe links found for selected emails."
+    else:
+        final_message = " ".join(message_parts)
+
+    # The primary purpose of this endpoint now is to identify mailto links.
+    # HTTP link processing confirmation will happen client-side.
     response_data = {
-        "success": True,
+        "success": True, # Success means the backend processed the request, not that unsubscribes worked
         "message": final_message,
         "details": {
-            "mailto_links": mailto_links,
-            "found_count": len(mailto_links)
+            "mailto_links": mailto_actions,
+            "found_count": len(mailto_actions) # Only count mailto links found by backend
         },
-        "http_link": None  # No HTTP link needed here as they're handled client-side
+        "http_link": None # No single HTTP link to return anymore
     }
 
-    status_code = 200 # Always success as we're just finding links, not processing
+    status_code = 200 
     return jsonify(response_data), status_code
 
 # --- Optimized Route for Batch Archiving --- 

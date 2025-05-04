@@ -46,39 +46,31 @@ function getEmailDetailsFromStorage() {
  */
 function initializeEmailDataStore() {
   const emailRows = document.querySelectorAll(".email-row");
-  const storedDetails = getEmailDetailsFromStorage();
+  const storedDetails = getEmailDetailsFromStorage(); // Get potentially existing data
 
   emailRows.forEach((row) => {
     const emailId = row.id.replace("email-", "");
     const checkbox = row.querySelector(".email-checkbox");
-    if (!checkbox) return;
+
+    if (!checkbox) {
+      return; // Skip if no checkbox
+    }
 
     const sender = checkbox.getAttribute("data-sender");
     if (!sender) return;
 
-    // Extract link data - first from direct attributes
-    let link = null;
-    let bodyLink = null;
+    // Extract all link data from attributes
+    const headerLink = checkbox.getAttribute("data-header-link");
+    const mailtoLink = checkbox.getAttribute("data-mailto-link");
+    const bodyLink = checkbox.getAttribute("data-body-link");
+    const primaryLink = checkbox.getAttribute("data-primary-link"); // Keep this if needed
 
-    // Try to get links from the row
-    const linkElements = row.querySelectorAll(
-      "a.unsubscribe-link, a.email-link"
-    );
-    if (linkElements.length > 0) {
-      link = linkElements[0].getAttribute("href");
-    }
-
-    // Check for data attributes that might contain body links
-    if (checkbox.hasAttribute("data-body-link")) {
-      bodyLink = checkbox.getAttribute("data-body-link");
-    }
-
-    // Store or update email details
+    // Store or update email details with all links
     storedDetails[emailId] = {
       id: emailId,
       sender: sender,
-      link: link,
-      type: link ? (link.startsWith("mailto:") ? "mailto" : "http") : null,
+      header_link: headerLink,
+      mailto_link: mailtoLink,
       body_link: bodyLink,
     };
   });
@@ -109,121 +101,57 @@ async function performUnsubscribe() {
     return;
   }
 
-  // Map email IDs to their senders for processing
+  // Map email IDs to their senders and collect all data needed for processing
   const senderMap = {};
-  const emailsWithNoLinks = [];
-  const allEmailDetails = [];
+  const emailsToProcess = []; // Array of objects: {id, sender, header_link, mailto_link, body_link}
+  const emailsForBackend = []; // IDs only
 
-  // Get stored email details for all selected emails
-  const storedEmailDetails = getEmailDetailsFromStorage();
-
-  // First analyze all selected emails to categorize them
   for (const emailId of selectedIdsFromStorage) {
-    let sender = null;
-    let unsubscribeLink = null;
-    let emailRow = null;
+    // Find the checkbox element on the current page
+    const checkbox = document.querySelector(
+      `.email-checkbox[value="${emailId}"]`
+    );
 
-    // First check if we have the details stored in sessionStorage
-    if (storedEmailDetails[emailId]) {
-      const details = storedEmailDetails[emailId];
-      sender = details.sender;
-      unsubscribeLink = details.link;
+    if (checkbox) {
+      // Checkbox found on page, read attributes directly
+      const sender = checkbox.getAttribute("data-sender");
+      const headerLink = checkbox.getAttribute("data-header-link");
+      const mailtoLink = checkbox.getAttribute("data-mailto-link");
+      const bodyLink = checkbox.getAttribute("data-body-link");
 
-      console.log(
-        `Using stored details for email ${emailId}: sender=${sender}, link=${unsubscribeLink}`
-      );
-    } else {
-      // Fallback to checking the DOM if the email is on the current page
-      const checkbox = document.querySelector(
-        `.email-checkbox[value="${emailId}"]`
-      );
-
-      if (checkbox) {
-        // Email is on current page
-        sender = checkbox.getAttribute("data-sender");
-        emailRow = document.getElementById(`email-${emailId}`);
-
-        // Extract unsubscribe link if available
-        // Try to find the link in different ways
-        // First check for direct links from email row
-        if (emailRow) {
-          const linkElements = emailRow.querySelectorAll(
-            "a.unsubscribe-link, a.email-link"
-          );
-          if (linkElements.length > 0) {
-            unsubscribeLink = linkElements[0].getAttribute("href");
-          }
-        }
-
-        // If no link found in email row, try to find sender's primary unsubscribe link
-        if (!unsubscribeLink && sender) {
-          // Find the sender group element
-          const senderId = sender
-            .replace(/\s+/g, "-")
-            .replace(/[<>]/g, "")
-            .replace(/@/g, "-")
-            .replace(/\./g, "-");
-
-          const senderGroup = document.getElementById(
-            `sender-group-${senderId}`
-          );
-          if (senderGroup) {
-            const headerLinks =
-              senderGroup.querySelectorAll(".sender-header a");
-            if (headerLinks.length > 0) {
-              unsubscribeLink = headerLinks[0].getAttribute("href");
-            }
-          }
-        }
-
-        // Save this info to storage for future use
-        if (sender) {
-          storedEmailDetails[emailId] = {
-            id: emailId,
-            sender: sender,
-            link: unsubscribeLink,
-            type: unsubscribeLink
-              ? unsubscribeLink.startsWith("mailto:")
-                ? "mailto"
-                : "http"
-              : null,
-          };
-          saveEmailDetailsToStorage(storedEmailDetails);
-        }
-      } else {
-        // Email is not on current page and we don't have stored details
-        console.log(
-          `Email ID ${emailId} not found on current page and no stored details, will be processed by backend`
+      if (!sender) {
+        console.warn(
+          `Missing sender for email ID: ${emailId} on current page. Adding to backend list.`
         );
-        emailsWithNoLinks.push(emailId);
-        continue;
+        if (!emailsForBackend.includes(emailId)) {
+          emailsForBackend.push(emailId);
+        }
+        continue; // Skip client-side processing
       }
-    }
 
-    if (!sender) {
-      console.warn(`Missing sender for email ID: ${emailId}`);
-      emailsWithNoLinks.push(emailId);
-      continue;
-    }
+      const emailData = {
+        id: emailId,
+        sender: sender,
+        header_link: headerLink,
+        mailto_link: mailtoLink,
+        body_link: bodyLink,
+      };
 
-    // Store email details
-    const emailDetails = {
-      id: emailId,
-      sender: sender,
-      link: unsubscribeLink,
-    };
+      emailsToProcess.push(emailData);
 
-    allEmailDetails.push(emailDetails);
-
-    // Group by sender
-    if (!senderMap[sender]) {
-      senderMap[sender] = [];
-    }
-    senderMap[sender].push(emailId);
-
-    // Track emails with no links
-    if (!unsubscribeLink) {
-      emailsWithNoLinks.push(emailId);
+      // Group by sender for the progress modal
+      if (!senderMap[sender]) {
+        senderMap[sender] = [];
+      }
+      senderMap[sender].push(emailId);
+    } else {
+      // Checkbox not found on this page, mark for backend processing
+      console.log(
+        `Email ID ${emailId} not found on page, adding to backend list.`
+      );
+      if (!emailsForBackend.includes(emailId)) {
+        emailsForBackend.push(emailId);
+      }
     }
   }
 
@@ -231,410 +159,283 @@ async function performUnsubscribe() {
   window.totalSendersToProcess = senders.length;
   window.currentSenderIndex = 0;
 
-  // To handle emails not on the current page, we'll send all IDs to the backend
-  // that aren't being processed on the client side
-  const shouldArchive = document.getElementById("archive-toggle").checked;
-  const buttonId = "unsubscribe-button";
-
-  // Show progress modal and get link maps
-  const { httpLinks, mailtoLinks } = showUnsubscribeProgressModal(senders);
-
-  // Process HTTP links on the client side
-  const httpSenders = Object.keys(httpLinks);
-  const mailtoSenders = Object.keys(mailtoLinks);
-
-  console.log(
-    `Processing client-side: ${httpSenders.length} HTTP links, ${mailtoSenders.length} mailto links`
-  );
-  console.log(
-    `${emailsWithNoLinks.length} emails have no direct unsubscribe links or are from other pages`
-  );
-
-  const successfullyProcessedIds = [];
-  const manuallyRequiredIds = []; // Track IDs requiring manual action
-  const failedIds = [];
-  const errors = [];
-  let lastHttpLink = null;
-
-  // Client-side HTTP link processing
-  console.log(
-    `Starting to process ${httpSenders.length} HTTP links in parallel`
-  );
-
-  // Process all HTTP links concurrently using Promise.all
-  const httpPromises = httpSenders.map(async (sender) => {
-    const link = httpLinks[sender];
-    updateSenderStatus(sender, "processing");
-
-    try {
-      console.log(`Processing HTTP link for ${sender}: ${link}`);
-
-      // Store for the modal (prioritize manual links)
-      if (!lastHttpLink) {
-        lastHttpLink = link;
-      }
-
-      let automaticSuccess = false;
-
-      if (link) {
-        try {
-          // Make a background HTTP request instead of opening a tab
-          console.log(`Fetching link in background: ${link}`);
-
-          // Using fetch with a timeout to avoid hanging
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-
-          const response = await fetch(link, {
-            method: "GET",
-            mode: "no-cors", // Important for cross-origin requests
-            redirect: "follow",
-            signal: controller.signal,
-          });
-
-          clearTimeout(timeoutId);
-
-          // Check if it's likely the unsubscribe was successful
-          // In no-cors mode, we don't have full response details, but we can assume success if it didn't throw
-          automaticSuccess = true;
-          console.log(`Successfully fetched ${link} for ${sender}`);
-        } catch (fetchError) {
-          console.warn(
-            `Fetch request failed for ${link}: ${fetchError.message}`
-          );
-          automaticSuccess = false;
-        }
-      }
-
-      // Mark as requiring manual action or automated success
-      const senderEmailIds = senderMap[sender] || [];
-
-      if (automaticSuccess) {
-        // Automatic success
-        senderEmailIds.forEach((id) => {
-          if (!successfullyProcessedIds.includes(id)) {
-            successfullyProcessedIds.push(id);
-          }
-        });
-
-        updateSenderStatus(sender, "completed");
-      } else {
-        // Manual action required
-        senderEmailIds.forEach((id) => {
-          if (!manuallyRequiredIds.includes(id)) {
-            manuallyRequiredIds.push(id);
-          }
-        });
-
-        // Check for body links in stored email details
-        let bodyLink = null;
-        for (const emailId of senderEmailIds) {
-          // Try to get body link from stored data
-          if (
-            storedEmailDetails[emailId]?.body_link &&
-            storedEmailDetails[emailId].body_link !== link
-          ) {
-            bodyLink = storedEmailDetails[emailId].body_link;
-            console.log(
-              `Found alternative body link for ${sender}: ${bodyLink}`
-            );
-            break;
-          }
-        }
-
-        // Update UI to show manual action required with appropriate link
-        if (bodyLink) {
-          updateSenderStatus(sender, "manual", "http", bodyLink);
-        } else {
-          updateSenderStatus(sender, "manual", "http");
-        }
-      }
-
-      window.currentSenderIndex++;
-      // Update progress based on the number of emails processed so far
-      const processedEmailCount =
-        successfullyProcessedIds.length + manuallyRequiredIds.length;
-      updateProgress(processedEmailCount);
-
-      return {
-        success: automaticSuccess,
-        manualRequired: !automaticSuccess,
-        sender,
-        link,
-      };
-    } catch (error) {
-      console.error(`Error processing HTTP link for ${sender}:`, error);
-      errors.push(
-        `Failed to process unsubscribe for ${sender}: ${error.message}`
-      );
-      failedIds.push(...(senderMap[sender] || []));
-      updateSenderStatus(sender, "error");
-
-      return { success: false, sender, error };
-    }
-  });
-
-  // Wait for all HTTP link processing to complete
-  await Promise.all(httpPromises);
-  console.log(`Completed processing ${httpSenders.length} HTTP links`);
-
-  // Process mailto links and any remaining emails through the backend
-  const emailsForBackend = [...emailsWithNoLinks];
-  mailtoSenders.forEach((sender) => {
-    emailsForBackend.push(...(senderMap[sender] || []));
-  });
-
-  // Add any emails from session storage that weren't found on this page
+  // Include emails not found on the current page in the backend list
   const emailIdsOnCurrentPage = Array.from(
     document.querySelectorAll(".email-checkbox")
   ).map((cb) => cb.value);
-  const emailIdsNotOnPage = selectedIdsFromStorage.filter(
-    (id) => !emailIdsOnCurrentPage.includes(id)
-  );
-  emailIdsNotOnPage.forEach((id) => {
-    if (!emailsForBackend.includes(id)) {
-      console.log(
-        `Adding email ID ${id} from another page to backend processing`
-      );
-      emailsForBackend.push(id);
+  selectedIdsFromStorage.forEach((id) => {
+    if (
+      !emailIdsOnCurrentPage.includes(id) &&
+      !emailsForBackend.includes(id) &&
+      !emailsToProcess.some((e) => e.id === id)
+    ) {
+      if (!emailsForBackend.includes(id)) {
+        console.log(`Adding email ID ${id} (not on page) to backend list.`);
+        emailsForBackend.push(id);
+      }
     }
   });
 
+  const shouldArchive = document.getElementById("archive-toggle").checked;
+  const buttonId = "unsubscribe-button";
+  setLoading(buttonId, "Processing...");
+
+  // Show progress modal - using senders from client-side emails
+  const { links } = showUnsubscribeProgressModal(senders);
+
+  const successfullyProcessedIds = [];
+  const manualActions = []; // Array of { message_id, link, type: 'mailto'/'body' }
+  const failedEmails = []; // Array of { id, error }
+  let archiveStatus = null;
+
+  console.log(`Processing ${emailsToProcess.length} emails client-side.`);
+
+  // Process client-side emails (attempt header links)
+  const clientPromises = emailsToProcess.map(async (email) => {
+    updateSenderStatus(email.sender, "processing");
+
+    if (email.header_link) {
+      // Attempt background request with header_link
+      try {
+        console.log(
+          `Attempting header link for ${email.sender} (${email.id}): ${email.header_link}`
+        );
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 sec timeout
+
+        const response = await fetch(email.header_link, {
+          method: "GET", // Or POST if header indicates
+          mode: "no-cors",
+          redirect: "follow",
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+
+        // Assume success if no error (best guess with no-cors)
+        successfullyProcessedIds.push(email.id);
+        updateSenderStatus(email.sender, "completed");
+        console.log(`Header link success (assumed) for ${email.id}`);
+        return { success: true, id: email.id };
+      } catch (fetchError) {
+        console.warn(
+          `Header link fetch failed for ${email.id} (${email.header_link}): ${fetchError.message}`
+        );
+        // Fall through to check for body/mailto link
+      }
+    }
+
+    // If header link failed or wasn't present, check for body or mailto for manual action
+    if (email.body_link) {
+      console.log(
+        `Header failed/missing, marking for manual body link for ${email.id}: ${email.body_link}`
+      );
+      manualActions.push({
+        message_id: email.id,
+        link: email.body_link,
+        type: "body",
+      });
+      updateSenderStatus(email.sender, "manual", {
+        link: email.body_link,
+        type: "body",
+      });
+      return {
+        manual: true,
+        id: email.id,
+        link: email.body_link,
+        type: "body",
+      };
+    } else if (email.mailto_link) {
+      console.log(
+        `Header failed/missing, marking for manual mailto link for ${email.id}: ${email.mailto_link}`
+      );
+      manualActions.push({
+        message_id: email.id,
+        link: email.mailto_link,
+        type: "mailto",
+      });
+      updateSenderStatus(email.sender, "manual", {
+        link: email.mailto_link,
+        type: "mailto",
+      });
+      return {
+        manual: true,
+        id: email.id,
+        link: email.mailto_link,
+        type: "mailto",
+      };
+    } else {
+      // No usable link found client-side
+      console.error(`No unsubscribe link found for ${email.id}`);
+      failedEmails.push({ id: email.id, error: "No unsubscribe link found" });
+      updateSenderStatus(email.sender, "error");
+      return { error: true, id: email.id, message: "No link" };
+    }
+  });
+
+  // Wait for all client-side processing to settle
+  await Promise.all(clientPromises);
+  console.log("Completed client-side processing.");
+
+  // Update progress based on client-side results
+  const clientProcessedCount =
+    successfullyProcessedIds.length +
+    manualActions.length +
+    failedEmails.length;
+  updateProgress(clientProcessedCount);
+
+  // Process any emails designated for the backend (e.g., those not on the page)
   if (emailsForBackend.length > 0) {
     console.log(
-      `Sending ${emailsForBackend.length} emails to backend for mailto/server processing`
+      `Sending ${emailsForBackend.length} email IDs to backend for processing.`
     );
+    const backendFormData = new FormData();
+    const backendEmailDetails = getEmailDetailsFromStorage();
 
-    const formData = new FormData();
-    emailsForBackend.forEach((id) => formData.append("email_ids", id));
-    formData.append("archive", "false"); // We'll do batch archiving separately
+    emailsForBackend.forEach((id) => {
+      backendFormData.append("email_ids", id);
+      // Send link data if available in storage
+      const details = backendEmailDetails[id];
+      backendFormData.append("header_links", details?.header_link || "null");
+      backendFormData.append("body_links", details?.body_link || "null");
+      backendFormData.append("mailto_links", details?.mailto_link || "null");
+    });
+    backendFormData.append("archive", "false"); // Archive handled separately
 
     try {
-      const response = await fetch(unsubscribeUrl, {
+      const backendResponse = await fetch(unsubscribeUrl, {
         method: "POST",
-        body: formData,
+        body: backendFormData,
       });
+      const backendResult = await backendResponse.json();
 
-      const resultData = await response.json();
-
-      if (response.ok && resultData.success) {
-        console.log("Backend processing successful");
-
-        // Add backend-processed IDs to our list
-        if (resultData.details && resultData.details.processed_email_ids) {
-          resultData.details.processed_email_ids.forEach((id) => {
-            if (!successfullyProcessedIds.includes(id)) {
-              successfullyProcessedIds.push(id);
+      if (backendResponse.ok && backendResult.success) {
+        console.log("Backend processing successful:", backendResult.message);
+        // Merge backend mailto links into manual actions
+        if (backendResult.details && backendResult.details.mailto_links) {
+          backendResult.details.mailto_links.forEach((mailtoAction) => {
+            // Avoid duplicates if already added from client-side fallback
+            if (
+              !manualActions.some(
+                (m) => m.message_id === mailtoAction.message_id
+              )
+            ) {
+              manualActions.push({ ...mailtoAction, type: "mailto" });
+              // Update progress modal if sender is visible
+              const sender =
+                backendEmailDetails[mailtoAction.message_id]?.sender;
+              if (sender) {
+                updateSenderStatus(sender, "manual", {
+                  link: mailtoAction.link,
+                  type: "mailto",
+                });
+              }
             }
           });
         }
-
-        // Update processing status for backend-processed senders
-        if (resultData.details && resultData.details.processed_senders) {
-          resultData.details.processed_senders.forEach((sender) => {
-            updateSenderStatus(sender, "completed");
-          });
-        }
-
-        // Get any HTTP link from backend
-        if (resultData.http_link && !lastHttpLink) {
-          lastHttpLink = resultData.http_link;
-        }
-
-        // Update progress with the new total processed count
-        const processedEmailCount =
-          successfullyProcessedIds.length + manuallyRequiredIds.length;
-        updateProgress(processedEmailCount);
+        // Add any newly processed IDs (though backend mainly handles mailto now)
+        // We assume backend doesn't auto-process HTTP links anymore
       } else {
-        console.error("Backend processing error:", resultData.error);
-        errors.push(resultData.error || "Backend processing failed");
-
-        // Add error details if available
-        if (resultData.details) {
-          if (resultData.details.unsubscribe_errors) {
-            errors.push(...resultData.details.unsubscribe_errors);
-          }
-        }
+        console.error(
+          "Backend processing error:",
+          backendResult.error || backendResult.message
+        );
+        // Add backend errors to the list - maybe map to specific email IDs if possible?
+        emailsForBackend.forEach((id) =>
+          failedEmails.push({
+            id: id,
+            error: backendResult.error || "Backend processing failed",
+          })
+        );
       }
     } catch (error) {
-      console.error("Error during backend processing:", error);
-      errors.push(`Network error during backend processing: ${error.message}`);
+      console.error("Error during backend fetch:", error);
+      emailsForBackend.forEach((id) =>
+        failedEmails.push({ id: id, error: `Network error: ${error.message}` })
+      );
     }
   }
 
-  // Ensure all selected emails from storage are included in the processing
-  selectedIdsFromStorage.forEach((id) => {
-    if (
-      !successfullyProcessedIds.includes(id) &&
-      !manuallyRequiredIds.includes(id) &&
-      !failedIds.includes(id)
-    ) {
-      // This email wasn't explicitly tracked anywhere, so consider it processed by backend
-      successfullyProcessedIds.push(id);
-    }
-  });
-
-  // Perform batch archive if needed
+  // --- Batch Archive (if requested) ---
   if (shouldArchive && selectedIdsFromStorage.length > 0) {
-    console.log(`Batch archiving ${selectedIdsFromStorage.length} emails`);
-
-    const formData = new FormData();
-    // Always use ALL emails from session storage for archiving
-    selectedIdsFromStorage.forEach((id) => formData.append("email_ids", id));
+    console.log(
+      `Starting batch archive for ${selectedIdsFromStorage.length} emails.`
+    );
+    const archiveFormData = new FormData();
+    selectedIdsFromStorage.forEach((id) =>
+      archiveFormData.append("email_ids", id)
+    );
 
     try {
-      const response = await fetch(archiveUrl, {
-        // URL should be provided by the template
+      const archiveResponse = await fetch(archiveUrl, {
         method: "POST",
-        body: formData,
+        body: archiveFormData,
       });
+      const archiveResult = await archiveResponse.json();
 
-      const archiveResult = await response.json();
-
-      if (!response.ok || !archiveResult.success) {
+      if (archiveResponse.ok && archiveResult.success) {
+        console.log("Archive successful:", archiveResult.message);
+        archiveStatus = {
+          success: true,
+          message: archiveResult.message,
+          permissionError: false,
+        };
+      } else {
         console.error(
-          "Archive operation failed:",
+          "Archive failed:",
           archiveResult.message || archiveResult.error
         );
-
-        // Check for permissions issue (status 403)
-        if (
-          response.status === 403 &&
-          archiveResult.details &&
-          archiveResult.details.reason
-        ) {
-          // This is a permissions issue - show the user a manual archive instruction
-          console.log(
-            "Permission issue detected:",
-            archiveResult.details.reason
-          );
-          errors.push(archiveResult.message);
-          if (archiveResult.details.help_text) {
-            errors.push(archiveResult.details.help_text);
-          }
-        } else if (
-          archiveResult.details &&
-          archiveResult.details.archive_errors
-        ) {
-          errors.push(...archiveResult.details.archive_errors);
-        } else {
-          errors.push("Failed to archive some emails");
-        }
+        const isPermissionError = archiveResponse.status === 403;
+        archiveStatus = {
+          success: false,
+          message: archiveResult.message || "Archive failed.",
+          permissionError: isPermissionError,
+        };
+        // Add archive errors to general errors if desired
+        // failedEmails.push({ id: 'archive', error: archiveStatus.message });
       }
     } catch (error) {
-      console.error("Error during archive operation:", error);
-      errors.push(`Network error during archiving: ${error.message}`);
+      console.error("Error during archive fetch:", error);
+      archiveStatus = {
+        success: false,
+        message: `Network error during archiving: ${error.message}`,
+        permissionError: false,
+      };
+      // failedEmails.push({ id: 'archive', error: archiveStatus.message });
     }
   }
 
-  // Final update to UI
-  // Consider all selected emails as "processed" for UI and cleanup purposes
+  // --- Finalize and Show Results ---
+  // Consolidate processed IDs for UI cleanup
   window.processedEmailIds = [...selectedIdsFromStorage];
 
-  // Construct final message
-  const successCount = successfullyProcessedIds.length;
-  const manualCount = manuallyRequiredIds.length;
-  const failCount = failedIds.length;
-
-  let message = "";
-
-  if (successCount > 0) {
-    message += `Automatically processed ${successCount} email${
-      successCount !== 1 ? "s" : ""
-    }.`;
-  }
-
-  if (manualCount > 0) {
-    if (message) message += " ";
-    message += `${manualCount} email${
-      manualCount !== 1 ? "s" : ""
-    } require manual action.`;
-  }
-
-  if (failCount > 0) {
-    if (message) message += " ";
-    message += `${failCount} email${failCount !== 1 ? "s" : ""} failed.`;
-  }
-
-  if (shouldArchive) {
-    if (message) message += " ";
-    const archivedCount = selectedIdsFromStorage.length;
-    message += `Archived ${archivedCount} email${
-      archivedCount !== 1 ? "s" : ""
-    }.`;
-  }
-
-  // Get all manual links for display in the result modal
-  const manualLinks = {};
-
-  // Collect links for emails requiring manual action
-  for (const sender of Object.keys(httpLinks)) {
-    if (
-      senderMap[sender] &&
-      senderMap[sender].some((id) => manuallyRequiredIds.includes(id))
-    ) {
-      manualLinks[sender] = httpLinks[sender];
-    }
-  }
-
-  for (const sender of Object.keys(mailtoLinks)) {
-    if (
-      senderMap[sender] &&
-      senderMap[sender].some((id) => manuallyRequiredIds.includes(id))
-    ) {
-      manualLinks[sender] = mailtoLinks[sender];
-    }
-  }
-
-  const resultData = {
-    success: failCount === 0,
-    message: message.trim(),
-    details: {
-      unsubscribe_errors: errors,
-      processed_senders: senders,
-      processed_email_ids: window.processedEmailIds,
-      manual_links: manualLinks,
-      manual_count: manualCount,
-    },
-    http_link: lastHttpLink,
-    has_manual_actions: manualCount > 0,
-  };
-
-  // Final progress update to ensure progress bar is complete
+  // Final progress update
   const finalProcessedCount =
-    successfullyProcessedIds.length + manuallyRequiredIds.length;
+    successfullyProcessedIds.length +
+    manualActions.length +
+    failedEmails.length;
   updateProgress(finalProcessedCount);
 
-  // Show completion modal
-  showModal(
-    renderSuccessModalContent(
-      resultData.message,
-      resultData.http_link,
-      resultData
-    )
-  );
+  // Prepare result data object for the modal
+  const finalResultData = {
+    processedEmailIds: window.processedEmailIds,
+    manualActions: manualActions, // Array: { message_id, link, type }
+    errors: failedEmails, // Array: { id, error }
+    archiveStatus: archiveStatus, // { success, message, permissionError }
+    message: "Processing complete.", // Generic message, detailed counts in modal
+  };
 
-  // Store the senders that were part of this batch
+  // Show completion modal using the consolidated data
+  showModal(renderSuccessModalContent(finalResultData));
+
+  // Store processed senders for UI marking
   storeProcessedSenders(senders);
-  markProcessedSenders(); // Immediately mark them on the current page
+  markProcessedSenders();
 
-  // Clear selection storage on successful processing
+  // Clear selection storage
   saveSelectedEmailsToStorage([]);
-  saveEmailDetailsToStorage({});
+  // Do NOT clear email details storage here, needed for modal rendering
 
-  // Hide loading state on button
-  const button = document.getElementById(buttonId);
-  if (button) {
-    button.disabled = false;
-    if (button.classList.contains("is-loading")) {
-      // If using the common loading function
-      hideLoading(buttonId);
-    } else {
-      // Manual reset
-      button.classList.remove("opacity-50", "cursor-not-allowed");
-      button.textContent = "Unsubscribe";
-    }
-  }
+  hideLoading(buttonId);
 }
 
 /**
@@ -712,6 +513,9 @@ async function performArchiveActionOnly() {
  */
 function removeProcessedEmails() {
   const listContainer = document.getElementById("subscription-list");
+
+  // Clear email details storage AFTER modal is closed and emails removed
+  saveEmailDetailsToStorage({});
 
   // Use the stored processedEmailIds set during the action call
   if (window.processedEmailIds && window.processedEmailIds.length > 0) {
@@ -802,6 +606,10 @@ function removeProcessedEmails() {
  * Update the status of a sender in the progress list
  */
 function updateSenderStatus(sender, status, linkType = null, bodyLink = null) {
+  // This function seems to be duplicated or from an older version.
+  // The version in scan-results-actions.js should be the primary one.
+  // Keeping this commented out for reference if needed.
+  /*
   const sendersList = document.getElementById("senders-progress-list");
   if (!sendersList) return;
 
@@ -878,6 +686,7 @@ function updateSenderStatus(sender, status, linkType = null, bodyLink = null) {
     statusText.textContent = "Error";
     statusText.className = "status-text text-xs text-destructive";
   }
+  */
 }
 
 // --- Global functions ---
