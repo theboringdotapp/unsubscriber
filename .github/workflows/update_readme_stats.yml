@@ -16,6 +16,9 @@ jobs:
       contents: write
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
       - name: Calculate Git Time Stats
         uses: theboringdotapp/git-time-stats-action@0.2
         with:
