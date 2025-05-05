@@ -26,3 +26,5 @@ jobs:
           session-gap: 45 # Minutes gap between sessions
           min-session: 5 # Minimum session duration in minutes
           max-session: 4 # Maximum session duration in hours Default is README.md
+          commit-changes: "true"
+          commit-message: "test: Update test README with time stats"
