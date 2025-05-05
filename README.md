@@ -50,13 +50,7 @@ A simple Flask web application to help users easily find and unsubscribe from ma
     *   `pip`
     *   Google Cloud Project with OAuth 2.0 Client ID credentials (see below).
 
-2.  **Clone the repository:**
-    ```bash
-    git clone https://github.com/your-username/gmail-bulk-unsub.git
-    cd gmail-bulk-unsub
-    ```
-
-3.  **Create Google OAuth Credentials:**
+2.  **Create Google OAuth Credentials:**
     *   Go to the [Google Cloud Console](https://console.cloud.google.com/).
     *   Create a new project or select an existing one.
     *   Enable the **Gmail API** under "APIs & Services" > "Library".
@@ -69,14 +63,14 @@ A simple Flask web application to help users easily find and unsubscribe from ma
     *   Click "Create".
     *   Download the JSON credentials file and save it as `credentials.json` in the project root directory. **IMPORTANT:** Add `credentials.json` to your `.gitignore` file to avoid committing secrets.
 
-4.  **Set up Python Environment:**
+3.  **Set up Python Environment:**
     ```bash
     python -m venv venv
     source venv/bin/activate  # On Windows use `venv\Scripts\activate`
     pip install -r requirements.txt
     ```
 
-5.  **Set Environment Variables (Optional but Recommended):**
+4.  **Set Environment Variables (Optional but Recommended):**
     *   Create a `.env` file in the root directory (add `.env` to `.gitignore`).
     *   Add a strong secret key:
         ```
@@ -92,7 +86,7 @@ A simple Flask web application to help users easily find and unsubscribe from ma
         export FLASK_DEBUG_MODE=True
         ```
 
-6.  **Run the Flask App:**
+5.  **Run the Flask App:**
     ```bash
     # Ensure FLASK_SECRET_KEY is set (either via .env loaded or exported)
     python api/index.py --port 5001 --debug
