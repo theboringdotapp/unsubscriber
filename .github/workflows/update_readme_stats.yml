@@ -20,7 +20,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Calculate Git Time Stats
-        uses: theboringdotapp/git-time-stats-action@0.2
+        uses: theboringdotapp/git-time-stats-action@1.0
         with:
           readme-path: "README.md" #
           session-gap: 45 # Minutes gap between sessions
